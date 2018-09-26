@@ -47,9 +47,15 @@
 
   <properties>
       <kafka-support.version>1.0</kafka-support.version>
-    </properties>
+    <ubirch-protocol-java.version>1.0</ubirch-protocol-java.version>
+  </properties>
 
   <dependencies>
+    <dependency>
+      <groupId>ubirch</groupId>
+      <artifactId>ubirch-protocol-java</artifactId>
+      <version>${ubirch-protocol-java.version}</version>
+    </dependency>
     <dependency>
       <groupId>ubirch</groupId>
       <artifactId>kafka-support</artifactId>
@@ -98,6 +104,11 @@
           <groupId>org.apache.kafka</groupId>
         </exclusion>
       </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.typesafe.akka</groupId>
+      <artifactId>akka-slf4j_${scala.major.version}</artifactId>
+      <version>${akka-slf4j.version}</version>
     </dependency>
 
     <!-- kafka -->

@@ -12,27 +12,28 @@ import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 
 import scala.collection.JavaConverters._
 
+//noinspection TypeAnnotation
 class RoutingTest extends FunSuite with Matchers with BeforeAndAfterAll {
 
-
-  test("messages are routed to the topic 'valid' or 'invalid' depending on signature validity") {
-    producer.send(MessageEnvelope.toRecord("incoming", "foo", MessageEnvelope("valid signature")))
-    producer.send(MessageEnvelope.toRecord("incoming", "bar", MessageEnvelope("invalid signature")))
-
+  test("valid signature is routed to 'valid' queue") {
+    val validMessage = "{\"version\":18,\"uuid\":\"6eac4d0b-16e6-4508-8c46-22e7451ea5a1\",\"hint\":239,\"signature\":\"YyC6ChlzkEOxL0oH98ytZz4ZOUEmE3uFlt3Ildy2X1/Pdp9BtSQvMScZKjUK6Y0berKHKR7LRYAwD7Ko+BBXCA==\",\"payload\":1}"
+    producer.send(MessageEnvelope.toRecord("incoming", "foo", MessageEnvelope(validMessage)))
     validTopicConsumer.subscribe(List("valid").asJava)
-    invalidTopicConsumer.subscribe(List("invalid").asJava)
 
     val validTopicRecords: ConsumerRecords[String, String] = validTopicConsumer.poll(5000)
-    val invalidTopicRecords: ConsumerRecords[String, String] = invalidTopicConsumer.poll(5000)
-
     validTopicRecords.count() should be(1)
-    invalidTopicRecords.count() should be(1)
 
     val approvedMessage = MessageEnvelope.fromRecord(validTopicRecords.iterator().next())
+    approvedMessage.payload should equal(validMessage)
+  }
+
+  test("invalid signature is routed to 'invalid' queue") {
+    producer.send(MessageEnvelope.toRecord("incoming", "bar", MessageEnvelope("invalid signature")))
+    invalidTopicConsumer.subscribe(List("invalid").asJava)
+
+    val invalidTopicRecords: ConsumerRecords[String, String] = invalidTopicConsumer.poll(5000)
+    invalidTopicRecords.count() should be(1)
     val rejectedMessage = MessageEnvelope.fromRecord(invalidTopicRecords.iterator().next())
-
-
-    approvedMessage.payload should equal("valid signature")
     rejectedMessage.payload should equal("invalid signature")
   }
 
