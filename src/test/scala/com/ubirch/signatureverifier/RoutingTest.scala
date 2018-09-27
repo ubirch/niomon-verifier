@@ -1,10 +1,13 @@
 package com.ubirch.signatureverifier
 
+import java.util.UUID
+
 import akka.Done
 import akka.kafka.scaladsl.Consumer
 import cakesolutions.kafka.testkit.KafkaServer
 import cakesolutions.kafka.{KafkaConsumer, KafkaProducer}
 import com.ubirch.kafkasupport.MessageEnvelope
+import org.apache.commons.codec.binary.Hex
 import org.apache.kafka.clients.admin.{AdminClient, AdminClientConfig, NewTopic}
 import org.apache.kafka.clients.consumer.{ConsumerRecords, OffsetResetStrategy}
 import org.apache.kafka.common.serialization.{StringDeserializer, StringSerializer}
@@ -46,8 +49,20 @@ class RoutingTest extends FunSuite with Matchers with BeforeAndAfterAll {
   override def beforeAll(): Unit = {
     kafkaServer.startup()
     createTopics("incoming", "invalid", "valid")
-    stream = verifierStream.run()
+    val keyServerClient = new KeyServerClient("") {
+      val knowUUID = UUID.fromString("6eac4d0b-16e6-4508-8c46-22e7451ea5a1")
+
+      override def getPublicKeys(uuid: UUID): List[Array[Byte]] = {
+        if(uuid == uuid) {
+          List(Hex.decodeHex("b12a906051f102881bbb487ee8264aa05d8d0fcc51218f2a47f562ceb9b0d068".toCharArray))
+        } else {
+          Nil
+        }
+      }
+    }
+    stream = SignatureVerifier(new Verifier(keyServerClient)).run()
   }
+
   override def afterAll(): Unit = {
     stream.shutdown().onComplete(_ => {
       producer.close()
