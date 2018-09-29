@@ -38,7 +38,7 @@ object SignatureVerifier extends StrictLogging {
     Try(JSONProtocolDecoder.getDecoder.decode(envelope.payload, verifier)) match {
       case Success(pm) => MessageEnvelopeWithRouting(envelope, validSignatureTopic)
       case Failure(e) =>
-        logger.error(s"signature verification failed: $envelope", e)
+        logger.warn(s"signature verification failed: $envelope", e)
         MessageEnvelopeWithRouting(envelope, invalidSignatureTopic)
     }
   }
