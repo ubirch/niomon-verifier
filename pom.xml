@@ -46,7 +46,7 @@
   </organization>
 
   <properties>
-    <build.number>0-dev</build.number>
+    <build.number>${timestamp}-dev</build.number>
     <kafka-support.version>1.0</kafka-support.version>
     <ubirch-protocol-java.version>1.0</ubirch-protocol-java.version>
     <skinny-framework.version>3.0.0</skinny-framework.version>
