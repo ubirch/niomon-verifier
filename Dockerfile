@@ -1,5 +1,7 @@
 FROM ubirch/java
 MAINTAINER Matthias L. Jugel <matthias.jugel@ubirch.com>
+ARG JAR_LIBS
+ARG JAR_FILE
 
 EXPOSE 8080
 EXPOSE 9010

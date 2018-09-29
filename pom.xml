@@ -282,7 +282,7 @@
         <configuration>
           <buildDirectory>${project.build.outputDirectory}</buildDirectory>
           <repository>ubirch/${project.artifactId}</repository>
-          <tag>${project.version}.${build.number}</tag>
+          <tag>v${project.version}.${build.number}</tag>
           <buildArgs>
             <JAR_LIBS>target/lib</JAR_LIBS>
             <JAR_FILE>target/${project.build.finalName}.${project.packaging}</JAR_FILE>
