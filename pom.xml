@@ -249,6 +249,7 @@
           </archive>
         </configuration>
       </plugin>
+      <!-- copy all dependencies into the target/lib dir for our docker image -->
       <plugin>
         <artifactId>maven-dependency-plugin</artifactId>
         <version>2.8</version>
@@ -266,6 +267,33 @@
           </execution>
         </executions>
       </plugin>
+      <!-- create a target/docker-compose.yml to start up locally -->
+      <plugin>
+        <artifactId>maven-resources-plugin</artifactId>
+        <version>${maven-resources-plugin.version}</version>
+        <executions>
+          <execution>
+            <id>copy-resources</id>
+            <phase>package</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.directory}</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>src/templates</directory>
+                  <filtering>true</filtering>
+                  <includes>
+                    <include>docker-compose.yml</include>
+                  </includes>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- create and/or push the created docker image -->
       <plugin>
         <groupId>com.spotify</groupId>
         <artifactId>dockerfile-maven-plugin</artifactId>
@@ -289,6 +317,7 @@
           </buildArgs>
         </configuration>
       </plugin>
+      <!-- for mvn deploy to work, disable the default deploy plugin -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-deploy-plugin</artifactId>
