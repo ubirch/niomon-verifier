@@ -1,7 +1,13 @@
 FROM ubirch/java
-MAINTAINER Matthias L. Jugel <matthias.jugel@ubirch.com>
 ARG JAR_LIBS
 ARG JAR_FILE
+ARG VERSION
+ARG BUILD
+ARG SERVICE_NAME
+
+LABEL "com.ubirch.service"="${SERVICE_NAME}"
+LABEL "com.ubirch.version"="${VERSION}"
+LABEL "com.ubirch.build"="${BUILD}"
 
 EXPOSE 8080
 EXPOSE 9010
