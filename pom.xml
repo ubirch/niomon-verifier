@@ -48,13 +48,13 @@
   <properties>
     <build.number>${timestamp}-dev</build.number>
     <kafka-support.version>1.0</kafka-support.version>
-    <ubirch-protocol-java.version>1.0</ubirch-protocol-java.version>
+    <ubirch-protocol-java.version>1.0.2-SNAPSHOT</ubirch-protocol-java.version>
     <skinny-framework.version>3.0.0</skinny-framework.version>
   </properties>
 
   <dependencies>
     <dependency>
-      <groupId>ubirch</groupId>
+      <groupId>com.ubirch</groupId>
       <artifactId>ubirch-protocol-java</artifactId>
       <version>${ubirch-protocol-java.version}</version>
     </dependency>
@@ -300,33 +300,17 @@
         <version>1.4.4</version>
         <executions>
           <execution>
-            <id>tag-build</id>
-            <phase>deploy</phase>
+            <id>default</id>
             <goals>
               <goal>build</goal>
-              <goal>tag</goal>
               <goal>push</goal>
             </goals>
-            <configuration>
-              <tag>${build.number}</tag>
-            </configuration>
-          </execution>
-          <execution>
-            <id>tag-version</id>
-            <phase>deploy</phase>
-            <goals>
-              <goal>build</goal>
-              <goal>tag</goal>
-              <goal>push</goal>
-            </goals>
-            <configuration>
-              <tag>${project.version}.${build.number}</tag>
-            </configuration>
           </execution>
         </executions>
         <configuration>
           <buildDirectory>${project.build.outputDirectory}</buildDirectory>
           <repository>ubirch/${project.artifactId}</repository>
+          <tag>${build.number}</tag>
           <buildArgs>
             <VERSION>${project.version}</VERSION>
             <BUILD>${build.number}</BUILD>
@@ -349,11 +333,6 @@
   </build>
 
   <repositories>
-    <repository>
-      <id>org.velvia</id>
-      <name>msgpack4s repository</name>
-      <url>http://dl.bintray.com/velvia/maven</url>
-    </repository>
     <!-- simple kafka client -->
     <repository>
       <id>bintray-cakesolutions-maven</id>
