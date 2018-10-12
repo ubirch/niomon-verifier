@@ -1,12 +1,17 @@
 package com.ubirch.signatureverifier
 
+import java.nio.charset.StandardCharsets
 import java.util.UUID
 
 import akka.Done
 import akka.kafka.scaladsl.Consumer
 import cakesolutions.kafka.testkit.KafkaServer
 import cakesolutions.kafka.{KafkaConsumer, KafkaProducer}
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.typesafe.scalalogging.StrictLogging
 import com.ubirch.kafkasupport.MessageEnvelope
+import com.ubirch.protocol.ProtocolMessageEnvelope
+import com.ubirch.protocol.codec.JSONProtocolDecoder
 import org.apache.commons.codec.binary.Hex
 import org.apache.kafka.clients.admin.{AdminClient, AdminClientConfig, NewTopic}
 import org.apache.kafka.clients.consumer.{ConsumerRecords, OffsetResetStrategy}
@@ -16,10 +21,15 @@ import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers}
 import scala.collection.JavaConverters._
 
 //noinspection TypeAnnotation
-class RoutingTest extends FunSuite with Matchers with BeforeAndAfterAll {
+class RoutingTest extends FunSuite with Matchers with BeforeAndAfterAll with StrictLogging {
 
   test("valid signature is routed to 'valid' queue") {
-    val validMessage = "{\"version\":18,\"uuid\":\"6eac4d0b-16e6-4508-8c46-22e7451ea5a1\",\"hint\":239,\"signature\":\"YyC6ChlzkEOxL0oH98ytZz4ZOUEmE3uFlt3Ildy2X1/Pdp9BtSQvMScZKjUK6Y0berKHKR7LRYAwD7Ko+BBXCA==\",\"payload\":1}"
+    val message = "{\"version\":18,\"uuid\":\"6eac4d0b-16e6-4508-8c46-22e7451ea5a1\",\"hint\":239,\"signature\":\"YyC6ChlzkEOxL0oH98ytZz4ZOUEmE3uFlt3Ildy2X1/Pdp9BtSQvMScZKjUK6Y0berKHKR7LRYAwD7Ko+BBXCA==\",\"payload\":1}"
+    val pm = JSONProtocolDecoder.getDecoder.decode(message)
+    val envelope = new ProtocolMessageEnvelope(pm, message.getBytes(StandardCharsets.UTF_8))
+    val validMessage = new ObjectMapper().writeValueAsString(envelope)
+    logger.info(validMessage)
+
     producer.send(MessageEnvelope.toRecord("incoming", "foo", MessageEnvelope(validMessage)))
     validTopicConsumer.subscribe(List("valid").asJava)
 

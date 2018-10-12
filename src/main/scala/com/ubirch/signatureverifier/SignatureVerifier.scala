@@ -8,6 +8,8 @@ import akka.stream.scaladsl.{Keep, RunnableGraph}
 import com.typesafe.scalalogging.StrictLogging
 import com.ubirch.kafkasupport.MessageEnvelope
 import com.ubirch.protocol.codec.JSONProtocolDecoder
+import org.json4s._
+import org.json4s.jackson.JsonMethods._
 
 import scala.util.{Failure, Success, Try}
 
@@ -35,7 +37,10 @@ object SignatureVerifier extends StrictLogging {
   }
 
   def determineRoutingBasedOnSignature(envelope: MessageEnvelope[String], verifier: Verifier): MessageEnvelopeWithRouting[String] = {
-    Try(JSONProtocolDecoder.getDecoder.decode(envelope.payload, verifier)) match {
+    implicit val formats: DefaultFormats.type = DefaultFormats
+
+    val message = (parse(envelope.payload) \ "raw").extract[String]
+    Try(JSONProtocolDecoder.getDecoder.decode(message, verifier)) match {
       case Success(pm) => MessageEnvelopeWithRouting(envelope, validSignatureTopic)
       case Failure(e) =>
         logger.warn(s"signature verification failed: $envelope", e)
