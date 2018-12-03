@@ -1,5 +1,7 @@
 package com.ubirch.signatureverifier
 
+import java.util.Base64
+
 import akka.Done
 import akka.kafka.scaladsl.Consumer.DrainingControl
 import akka.kafka.scaladsl.{Consumer, Producer}
@@ -9,7 +11,6 @@ import com.typesafe.scalalogging.StrictLogging
 import com.ubirch.kafkasupport.MessageEnvelope
 import com.ubirch.protocol.codec.JSONProtocolDecoder
 import org.json4s._
-import org.json4s.jackson.JsonMethods._
 
 import scala.util.{Failure, Success, Try}
 
@@ -39,11 +40,17 @@ object SignatureVerifier extends StrictLogging {
   def determineRoutingBasedOnSignature(envelope: MessageEnvelope[String], verifier: Verifier): MessageEnvelopeWithRouting[String] = {
     implicit val formats: DefaultFormats.type = DefaultFormats
 
-    val message = (parse(envelope.payload) \ "raw").extract[String]
-    Try(JSONProtocolDecoder.getDecoder.decode(message, verifier)) match {
-      case Success(pm) => MessageEnvelopeWithRouting(envelope, validSignatureTopic)
-      case Failure(e) =>
-        logger.warn(s"signature verification failed: $envelope", e)
+    envelope.raw match {
+      case Some(signedMessage) =>
+        val message = Base64.getDecoder.decode(signedMessage)
+        Try(JSONProtocolDecoder.getDecoder.decode(signedMessage, verifier)) match {
+          case Success(pm) => MessageEnvelopeWithRouting(envelope, validSignatureTopic)
+          case Failure(e) =>
+            logger.warn(s"signature verification failed: $envelope", e)
+            MessageEnvelopeWithRouting(envelope, invalidSignatureTopic)
+        }
+      case None =>
+        logger.error(s"can't check signature without message: $envelope")
         MessageEnvelopeWithRouting(envelope, invalidSignatureTopic)
     }
   }
