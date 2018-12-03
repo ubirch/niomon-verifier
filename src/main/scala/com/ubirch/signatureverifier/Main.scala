@@ -38,6 +38,8 @@ class Verifier(keyServer: KeyServerClient) extends ProtocolVerifier with StrictL
   @throws[SignatureException]
   @throws[InvalidKeyException]
   override def verify(uuid: UUID, data: Array[Byte], offset: Int, len: Int, signature: Array[Byte]): Boolean = {
+    if(signature == null) throw new SignatureException("signature must not be null")
+
     val digest: MessageDigest = MessageDigest.getInstance("SHA-512")
     val signEngine = new EdDSAEngine(digest)
 
