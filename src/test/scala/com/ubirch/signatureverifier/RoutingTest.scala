@@ -4,6 +4,7 @@ import java.util.UUID
 
 import akka.Done
 import akka.kafka.scaladsl.Consumer
+import akka.stream.UniqueKillSwitch
 import cakesolutions.kafka.testkit.KafkaServer
 import cakesolutions.kafka.{KafkaConsumer, KafkaProducer}
 import com.fasterxml.jackson.databind.{MapperFeature, ObjectMapper, SerializationFeature}
@@ -76,7 +77,7 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
   val producer = createProducer(kafkaServer.kafkaPort)
   val invalidTopicConsumer = createConsumer(kafkaServer.kafkaPort, "1")
   val validTopicConsumer = createConsumer(kafkaServer.kafkaPort, "2")
-  var stream: Consumer.DrainingControl[Done] = _
+  var stream: UniqueKillSwitch = _
 
   override def beforeAll(): Unit = {
     kafkaServer.startup()
@@ -85,7 +86,7 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
       val knowUUID = UUID.fromString("6eac4d0b-16e6-4508-8c46-22e7451ea5a1")
 
       override def getPublicKeys(uuid: UUID): List[Array[Byte]] = {
-        if(uuid == uuid) {
+        if (uuid == uuid) {
           List(Hex.decodeHex("b12a906051f102881bbb487ee8264aa05d8d0fcc51218f2a47f562ceb9b0d068".toCharArray))
         } else {
           Nil
@@ -96,31 +97,30 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
   }
 
   override def afterAll(): Unit = {
-    stream.shutdown().onComplete(_ => {
-      producer.close()
-      invalidTopicConsumer.close()
-      validTopicConsumer.close()
-      kafkaServer.close()
-    })
+    stream.shutdown()
+    producer.close()
+    invalidTopicConsumer.close()
+    validTopicConsumer.close()
+    kafkaServer.close()
   }
 
 
   private def createConsumer(kafkaPort: Int, groupId: String) = {
     KafkaConsumer(
       KafkaConsumer.Conf(new StringDeserializer(),
-                         new StringDeserializer(),
-                         bootstrapServers = s"localhost:$kafkaPort",
-                         groupId = groupId,
-                         autoOffsetReset = OffsetResetStrategy.EARLIEST)
+        new StringDeserializer(),
+        bootstrapServers = s"localhost:$kafkaPort",
+        groupId = groupId,
+        autoOffsetReset = OffsetResetStrategy.EARLIEST)
     )
   }
 
   private def createProducer(kafkaPort: Int) = {
     KafkaProducer(
       KafkaProducer.Conf(new StringSerializer(),
-                         new StringSerializer(),
-                         bootstrapServers = s"localhost:$kafkaPort",
-                         acks = "all"))
+        new StringSerializer(),
+        bootstrapServers = s"localhost:$kafkaPort",
+        acks = "all"))
   }
 
 
@@ -137,7 +137,7 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
     val configMap = Map[String, AnyRef](
       AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG -> s"localhost:$kafkaPort",
       AdminClientConfig.CLIENT_ID_CONFIG -> "admin",
-      )
+    )
     AdminClient.create(configMap.asJava)
   }
 
