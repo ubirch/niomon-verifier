@@ -14,7 +14,10 @@ import skinny.http.HTTP
 
 object Main {
 
-  val KEY_SERVER_URL = s"${conf.getString("ubirchKeyService.client.rest.host")}/api/keyService/v1"
+  val KEY_SERVER_URL: String = {
+    val url = s"${conf.getString("ubirchKeyService.client.rest.host")}/api/keyService/v1"
+    if (url.startsWith("http://") || url.startsWith("https://")) url else s"http://$url"
+  }
 
   def main(args: Array[String]) {
     SignatureVerifier(new Verifier(new KeyServerClient(KEY_SERVER_URL))).run()
