@@ -1,5 +1,6 @@
 package com.ubirch.signatureverifier
 
+import java.time.Duration
 import java.util.UUID
 
 import akka.Done
@@ -40,7 +41,7 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
     producer.send(MessageEnvelope.toRecord("incoming", "foo", MessageEnvelope(validMessage)))
     validTopicConsumer.subscribe(List("valid").asJava)
 
-    val validTopicRecords: ConsumerRecords[String, String] = validTopicConsumer.poll(5000)
+    val validTopicRecords: ConsumerRecords[String, String] = validTopicConsumer.poll(Duration.ofSeconds(10))
     validTopicRecords.count() should be(1)
 
     val approvedMessage = MessageEnvelope.fromRecord(validTopicRecords.iterator().next())
@@ -56,7 +57,7 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
     producer.send(MessageEnvelope.toRecord("incoming", "foo", MessageEnvelope(validMessage)))
     validTopicConsumer.subscribe(List("valid").asJava)
 
-    val validTopicRecords: ConsumerRecords[String, String] = validTopicConsumer.poll(5000)
+    val validTopicRecords: ConsumerRecords[String, String] = validTopicConsumer.poll(Duration.ofSeconds(10))
     validTopicRecords.count() should be(1)
 
     val approvedMessage = MessageEnvelope.fromRecord(validTopicRecords.iterator().next())
@@ -67,7 +68,7 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
     producer.send(MessageEnvelope.toRecord("incoming", "bar", MessageEnvelope("invalid signature")))
     invalidTopicConsumer.subscribe(List("invalid").asJava)
 
-    val invalidTopicRecords: ConsumerRecords[String, String] = invalidTopicConsumer.poll(5000)
+    val invalidTopicRecords: ConsumerRecords[String, String] = invalidTopicConsumer.poll(Duration.ofSeconds(10))
     invalidTopicRecords.count() should be(1)
     val rejectedMessage = MessageEnvelope.fromRecord(invalidTopicRecords.iterator().next())
     rejectedMessage.payload should equal("invalid signature")
