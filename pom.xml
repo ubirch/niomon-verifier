@@ -48,8 +48,7 @@
   <properties>
     <build.number>${timestamp}-dev</build.number>
     <kafka-support.version>1.0.0</kafka-support.version>
-    <ubirch-protocol-java.version>1.0.3</ubirch-protocol-java.version>
-    <skinny-framework.version>3.0.0</skinny-framework.version>
+    <skinny-framework.version>3.0.1</skinny-framework.version>
   </properties>
 
   <dependencies>
@@ -66,7 +65,7 @@
 
     <dependency>
       <groupId>org.skinny-framework</groupId>
-      <artifactId>skinny-http-client_2.12</artifactId>
+      <artifactId>skinny-http-client_${scala.major.version}</artifactId>
       <version>${skinny-framework.version}</version>
     </dependency>
 
@@ -155,8 +154,8 @@
     </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.module</groupId>
-      <artifactId>jackson-module-scala_2.12</artifactId>
-      <version>2.9.7</version>
+      <artifactId>jackson-module-scala_${scala.major.version}</artifactId>
+      <version>2.9.8</version>
     </dependency>
 
     <dependency>
