@@ -1,10 +1,24 @@
+/*
+ * Copyright (c) 2019 ubirch GmbH
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.ubirch.signatureverifier
 
 import java.time.Duration
 import java.util.UUID
 
-import akka.Done
-import akka.kafka.scaladsl.Consumer
 import akka.stream.UniqueKillSwitch
 import cakesolutions.kafka.testkit.KafkaServer
 import cakesolutions.kafka.{KafkaConsumer, KafkaProducer}
@@ -97,6 +111,23 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
     stream = SignatureVerifier(new Verifier(keyServerClient)).run()
   }
 
+  def createTopics(topicName: String*): Unit = {
+    val adminClient = createAdmin(kafkaServer.kafkaPort)
+    val topics = topicName.map(new NewTopic(_, 1, 1))
+    val createTopicsResult = adminClient.createTopics(topics.toList.asJava)
+    // finish futures
+    topicName.foreach(t => createTopicsResult.values.get(t).get())
+    adminClient.close()
+  }
+
+  private def createAdmin(kafkaPort: Int) = {
+    val configMap = Map[String, AnyRef](
+      AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG -> s"localhost:$kafkaPort",
+      AdminClientConfig.CLIENT_ID_CONFIG -> "admin",
+    )
+    AdminClient.create(configMap.asJava)
+  }
+
   override def afterAll(): Unit = {
     stream.shutdown()
     producer.close()
@@ -104,7 +135,6 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
     validTopicConsumer.close()
     kafkaServer.close()
   }
-
 
   private def createConsumer(kafkaPort: Int, groupId: String) = {
     KafkaConsumer(
@@ -122,24 +152,6 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
         new StringSerializer(),
         bootstrapServers = s"localhost:$kafkaPort",
         acks = "all"))
-  }
-
-
-  def createTopics(topicName: String*): Unit = {
-    val adminClient = createAdmin(kafkaServer.kafkaPort)
-    val topics = topicName.map(new NewTopic(_, 1, 1))
-    val createTopicsResult = adminClient.createTopics(topics.toList.asJava)
-    // finish futures
-    topicName.foreach(t => createTopicsResult.values.get(t).get())
-    adminClient.close()
-  }
-
-  private def createAdmin(kafkaPort: Int) = {
-    val configMap = Map[String, AnyRef](
-      AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG -> s"localhost:$kafkaPort",
-      AdminClientConfig.CLIENT_ID_CONFIG -> "admin",
-    )
-    AdminClient.create(configMap.asJava)
   }
 
 }
