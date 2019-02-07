@@ -22,8 +22,10 @@ import akka.kafka.{ConsumerMessage, ProducerMessage, Subscriptions}
 import akka.stream.scaladsl.{Keep, RestartSink, RestartSource, RunnableGraph, Sink, Source}
 import akka.stream.{KillSwitches, UniqueKillSwitch}
 import com.typesafe.scalalogging.StrictLogging
-import com.ubirch.kafkasupport.MessageEnvelope
+import com.ubirch.kafka.MessageEnvelope
 import com.ubirch.protocol.ProtocolMessage
+import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.kafka.clients.producer.ProducerRecord
 import org.json4s.DefaultFormats
 
 import scala.concurrent.duration._
@@ -37,16 +39,14 @@ import scala.util.{Failure, Success, Try}
 object SignatureVerifier extends StrictLogging {
   implicit val formats: DefaultFormats.type = DefaultFormats
 
-  import org.json4s.jackson.JsonMethods._
-
-  val kafkaSource: Source[ConsumerMessage.CommittableMessage[String, String], NotUsed] =
+  val kafkaSource: Source[ConsumerMessage.CommittableMessage[String, MessageEnvelope], NotUsed] =
     RestartSource.withBackoff(
       minBackoff = 2.seconds,
       maxBackoff = 1.minute,
       randomFactor = 0.2
     ) { () => Consumer.committableSource(consumerSettings, Subscriptions.topics(incomingTopic)) }
 
-  val kafkaSink: Sink[ProducerMessage.Envelope[String, String, ConsumerMessage.Committable], NotUsed] =
+  val kafkaSink: Sink[ProducerMessage.Envelope[String, MessageEnvelope, ConsumerMessage.Committable], NotUsed] =
     RestartSink.withBackoff(
       minBackoff = 2.seconds,
       maxBackoff = 1.minute,
@@ -57,27 +57,29 @@ object SignatureVerifier extends StrictLogging {
     kafkaSource
       .viaMat(KillSwitches.single)(Keep.right)
       .map { msg =>
-        val messageEnvelope = MessageEnvelope.fromRecord(msg.record)
-        val envelopeWithRouting = determineRoutingBasedOnSignature(messageEnvelope, verifier)
+        val record = msg.record
+        val routedRecord = determineRoutingBasedOnSignature(record, verifier)
 
-        val recordToSend = MessageEnvelope.toRecord(envelopeWithRouting.destinationTopic, msg.record.key(), envelopeWithRouting.messageEnvelope)
-        ProducerMessage.Message[String, String, ConsumerMessage.CommittableOffset](
-          recordToSend,
+        ProducerMessage.Message[String, MessageEnvelope, ConsumerMessage.CommittableOffset](
+          routedRecord,
           msg.committableOffset
         )
       }
       .to(kafkaSink)
   }
 
-  def determineRoutingBasedOnSignature(envelope: MessageEnvelope[String], verifier: Verifier): MessageEnvelopeWithRouting[String] = {
+  def determineRoutingBasedOnSignature(record: ConsumerRecord[String, MessageEnvelope], verifier: Verifier): ProducerRecord[String, MessageEnvelope] = {
     Try {
-      val pm = mapper.readValue(envelope.payload, classOf[ProtocolMessage])
+      val pm = record.value().ubirchPacket
       verifier.verify(pm.getUUID, pm.getSigned, 0, pm.getSigned.length, pm.getSignature)
     } match {
-      case Success(pm) => MessageEnvelopeWithRouting(envelope, validSignatureTopic)
+      case Success(true) => record.toProducerRecord(validSignatureTopic)
+      case Success(false) =>
+        logger.warn(s"signature verification failed: $record, (Verifier.verify returned false)")
+        record.toProducerRecord(invalidSignatureTopic)
       case Failure(e) =>
-        logger.warn(s"signature verification failed: $envelope", e)
-        MessageEnvelopeWithRouting(envelope, invalidSignatureTopic)
+        logger.warn(s"signature verification failed: $record", e)
+        record.toProducerRecord(invalidSignatureTopic)
     }
   }
 }

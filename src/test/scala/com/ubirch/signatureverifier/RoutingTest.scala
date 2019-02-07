@@ -26,12 +26,13 @@ import com.fasterxml.jackson.databind.{MapperFeature, ObjectMapper, Serializatio
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import com.typesafe.scalalogging.StrictLogging
-import com.ubirch.kafkasupport.MessageEnvelope
-import com.ubirch.protocol.ProtocolMessageViews
+import com.ubirch.kafka.{EnvelopeDeserializer, EnvelopeSerializer, MessageEnvelope}
+import com.ubirch.protocol.{ProtocolMessage, ProtocolMessageViews}
 import com.ubirch.protocol.codec.{JSONProtocolDecoder, MsgPackProtocolDecoder}
 import org.apache.commons.codec.binary.Hex
 import org.apache.kafka.clients.admin.{AdminClient, AdminClientConfig, NewTopic}
 import org.apache.kafka.clients.consumer.{ConsumerRecords, OffsetResetStrategy}
+import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.{StringDeserializer, StringSerializer}
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
@@ -49,43 +50,44 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
   "msgpack with valid signature" should "be routed to 'valid' queue" in {
     val message = Hex.decodeHex("9512b06eac4d0b16e645088c4622e7451ea5a1ccef01da0040578a5b22ceb3e1d0d0f8947c098010133b44d3b1d2ab398758ffed11507b607ed37dbbe006f645f0ed0fdbeb1b48bb50fd71d832340ce024d5a0e21c0ebc8e0e".toCharArray)
     val pm = MsgPackProtocolDecoder.getDecoder.decode(message)
-    val validMessage = mapper.writeValueAsString(pm)
-    logger.info(validMessage)
+    val validMessage = MessageEnvelope(pm)
+    logger.info(validMessage.toString)
 
-    producer.send(MessageEnvelope.toRecord("incoming", "foo", MessageEnvelope(validMessage)))
+    producer.send(new ProducerRecord("incoming", "foo", validMessage))
     validTopicConsumer.subscribe(List("valid").asJava)
 
-    val validTopicRecords: ConsumerRecords[String, String] = validTopicConsumer.poll(Duration.ofSeconds(10))
+    val validTopicRecords: ConsumerRecords[String, MessageEnvelope] = validTopicConsumer.poll(Duration.ofSeconds(10))
     validTopicRecords.count() should be(1)
 
-    val approvedMessage = MessageEnvelope.fromRecord(validTopicRecords.iterator().next())
-    approvedMessage.payload should equal(validMessage)
+    val approvedMessage = validTopicRecords.iterator().next()
+    approvedMessage.value().toString should equal(validMessage.toString) // ProtocolMessage doesn't override equals :'(
   }
 
   "json with valid signature" should "be routed to 'valid' queue" in {
     val message = "{\"version\":18,\"uuid\":\"6eac4d0b-16e6-4508-8c46-22e7451ea5a1\",\"hint\":239,\"signature\":\"YyC6ChlzkEOxL0oH98ytZz4ZOUEmE3uFlt3Ildy2X1/Pdp9BtSQvMScZKjUK6Y0berKHKR7LRYAwD7Ko+BBXCA==\",\"payload\":1}"
     val pm = JSONProtocolDecoder.getDecoder.decode(message)
-    val validMessage = mapper.writeValueAsString(pm)
-    logger.info(validMessage)
+    val validMessage = MessageEnvelope(pm)
+    logger.info(validMessage.toString)
 
-    producer.send(MessageEnvelope.toRecord("incoming", "foo", MessageEnvelope(validMessage)))
+    producer.send(new ProducerRecord("incoming", "foo", validMessage))
     validTopicConsumer.subscribe(List("valid").asJava)
 
-    val validTopicRecords: ConsumerRecords[String, String] = validTopicConsumer.poll(Duration.ofSeconds(10))
+    val validTopicRecords: ConsumerRecords[String, MessageEnvelope] = validTopicConsumer.poll(Duration.ofSeconds(10))
     validTopicRecords.count() should be(1)
 
-    val approvedMessage = MessageEnvelope.fromRecord(validTopicRecords.iterator().next())
-    approvedMessage.payload should equal(validMessage)
+    val approvedMessage = validTopicRecords.iterator().next()
+    approvedMessage.value().toString should equal(validMessage.toString) // ProtocolMessage doesn't override equals :'(
   }
 
   "json with invalid signature " should "be routed to 'invalid' queue" in {
-    producer.send(MessageEnvelope.toRecord("incoming", "bar", MessageEnvelope("invalid signature")))
+    val invalidMessage = MessageEnvelope(new ProtocolMessage())
+    producer.send(new ProducerRecord("incoming", "bar", invalidMessage))
     invalidTopicConsumer.subscribe(List("invalid").asJava)
 
-    val invalidTopicRecords: ConsumerRecords[String, String] = invalidTopicConsumer.poll(Duration.ofSeconds(10))
+    val invalidTopicRecords: ConsumerRecords[String, MessageEnvelope] = invalidTopicConsumer.poll(Duration.ofSeconds(10))
     invalidTopicRecords.count() should be(1)
-    val rejectedMessage = MessageEnvelope.fromRecord(invalidTopicRecords.iterator().next())
-    rejectedMessage.payload should equal("invalid signature")
+    val rejectedMessage = invalidTopicRecords.iterator().next()
+    rejectedMessage.value().toString should equal(invalidMessage.toString) // ProtocolMessage doesn't override equals :'(
   }
 
   val kafkaServer = new KafkaServer(9992)
@@ -139,7 +141,7 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
   private def createConsumer(kafkaPort: Int, groupId: String) = {
     KafkaConsumer(
       KafkaConsumer.Conf(new StringDeserializer(),
-        new StringDeserializer(),
+        EnvelopeDeserializer,
         bootstrapServers = s"localhost:$kafkaPort",
         groupId = groupId,
         autoOffsetReset = OffsetResetStrategy.EARLIEST)
@@ -149,7 +151,7 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
   private def createProducer(kafkaPort: Int) = {
     KafkaProducer(
       KafkaProducer.Conf(new StringSerializer(),
-        new StringSerializer(),
+        EnvelopeSerializer,
         bootstrapServers = s"localhost:$kafkaPort",
         acks = "all"))
   }
