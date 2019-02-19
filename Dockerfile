@@ -24,6 +24,8 @@ ENTRYPOINT [ \
   "-Dcom.sun.management.jmxremote.local.only=false", \
   "-Dcom.sun.management.jmxremote.authenticate=false", \
   "-Dcom.sun.management.jmxremote.ssl=false", \
+  "-Dconfig.resource=application-docker.conf", \
+  "-Dlogback.configurationFile=logback-docker.xml", \
   "-jar", "/usr/share/service/main.jar" \
 ]
 
