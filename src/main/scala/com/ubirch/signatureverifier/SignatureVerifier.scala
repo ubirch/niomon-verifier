@@ -76,10 +76,10 @@ object SignatureVerifier extends StrictLogging {
       case Success(true) => record.toProducerRecord(validSignatureTopic)
       case Success(false) =>
         logger.warn(s"signature verification failed: $record, (Verifier.verify returned false)")
-        record.toProducerRecord(invalidSignatureTopic)
+        record.toProducerRecord(invalidSignatureTopic).withExtraHeaders("http-status-code" -> "400")
       case Failure(e) =>
         logger.warn(s"signature verification failed: $record", e)
-        record.toProducerRecord(invalidSignatureTopic)
+        record.toProducerRecord(invalidSignatureTopic).withExtraHeaders("http-status-code" -> "400")
     }
   }
 }
