@@ -53,7 +53,7 @@ object SignatureVerifier extends StrictLogging {
       randomFactor = 0.2
     ) { () => Producer.commitableSink(producerSettings) }
 
-  def apply(verifier: Verifier): RunnableGraph[UniqueKillSwitch] = {
+  def apply(verifier: Verifier): RunnableGraph[UniqueKillSwitch] =
     kafkaSource
       .viaMat(KillSwitches.single)(Keep.right)
       .map { msg =>
@@ -64,9 +64,11 @@ object SignatureVerifier extends StrictLogging {
           routedRecord,
           msg.committableOffset
         )
-      }
-      .to(kafkaSink)
-  }
+      }.mapError { case e =>
+        logger.error("unexpected error in the verifier flow", e)
+        e
+      }.to(kafkaSink)
+
 
   def determineRoutingBasedOnSignature(record: ConsumerRecord[String, MessageEnvelope], verifier: Verifier): ProducerRecord[String, MessageEnvelope] = {
     Try {
