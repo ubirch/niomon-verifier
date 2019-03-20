@@ -19,6 +19,7 @@ package com.ubirch.signatureverifier
 import java.security.{InvalidKeyException, MessageDigest, SignatureException}
 import java.util.{Base64, UUID}
 
+import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import com.ubirch.protocol.ProtocolVerifier
 import net.i2p.crypto.eddsa.spec.{EdDSANamedCurveSpec, EdDSANamedCurveTable, EdDSAPublicKeySpec}
@@ -29,14 +30,13 @@ import org.json4s.{DefaultFormats, JValue}
 import skinny.http.HTTP
 
 object Main {
-
-  val KEY_SERVER_URL: String = {
+  def getKeyServerUrl(conf: Config): String = {
     val url = s"${conf.getString("ubirchKeyService.client.rest.host")}/api/keyService/v1"
     if (url.startsWith("http://") || url.startsWith("https://")) url else s"http://$url"
   }
 
   def main(args: Array[String]) {
-    SignatureVerifier(new Verifier(new KeyServerClient(KEY_SERVER_URL))).run()
+    new SignatureVerifierMicroservice(c => new Verifier(new KeyServerClient(getKeyServerUrl(c)))).runUntilDone
   }
 }
 

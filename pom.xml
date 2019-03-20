@@ -52,14 +52,9 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.ubirch</groupId>
-            <artifactId>ubirch-protocol-java</artifactId>
-            <version>${ubirch-protocol-java.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.ubirch</groupId>
-            <artifactId>ubirch-kafka-envelope</artifactId>
-            <version>${ubirch-kafka-envelope.version}</version>
+            <groupId>ubirch</groupId>
+            <artifactId>microservice-base</artifactId>
+            <version>1.0.0</version>
         </dependency>
 
         <dependency>
@@ -84,53 +79,6 @@
             <artifactId>logback-classic</artifactId>
             <version>${logback-classic.version}</version>
         </dependency>
-        <!-- akka -->
-        <dependency>
-            <groupId>com.typesafe.akka</groupId>
-            <artifactId>akka-actor_${scala.major.version}</artifactId>
-            <version>${akka.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.typesafe.akka</groupId>
-            <artifactId>akka-testkit_${scala.major.version}</artifactId>
-            <version>${akka.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.typesafe.akka</groupId>
-            <artifactId>akka-stream_${scala.major.version}</artifactId>
-            <version>${akka.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.typesafe.akka</groupId>
-            <artifactId>akka-stream-kafka_${scala.major.version}</artifactId>
-            <version>${akka.stream.kafka.version}</version>
-            <exclusions>
-                <exclusion>
-                    <artifactId>kafka-clients</artifactId>
-                    <groupId>org.apache.kafka</groupId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>com.typesafe.akka</groupId>
-            <artifactId>akka-slf4j_${scala.major.version}</artifactId>
-            <version>${akka-slf4j.version}</version>
-        </dependency>
-
-        <!-- kafka -->
-        <dependency>
-            <groupId>net.cakesolutions</groupId>
-            <artifactId>scala-kafka-client_${scala.major.version}</artifactId>
-            <version>${simple.kafka.client.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>net.cakesolutions</groupId>
-            <artifactId>scala-kafka-client-testkit_${scala.major.version}</artifactId>
-            <version>${simple.kafka.client.version}</version>
-            <scope>test</scope>
-        </dependency>
-
 
         <!-- test dependencies -->
         <dependency>
@@ -141,22 +89,6 @@
         </dependency>
 
         <!-- other dependencies -->
-        <dependency>
-            <groupId>org.json4s</groupId>
-            <artifactId>json4s-native_${scala.major.version}</artifactId>
-            <version>${json4s-native.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.json4s</groupId>
-            <artifactId>json4s-jackson_${scala.major.version}</artifactId>
-            <version>${json4s-jackson.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.module</groupId>
-            <artifactId>jackson-module-scala_${scala.major.version}</artifactId>
-            <version>2.9.8</version>
-        </dependency>
-
         <dependency>
             <groupId>io.jvm.uuid</groupId>
             <artifactId>scala-uuid_${scala.major.version}</artifactId>
@@ -193,6 +125,9 @@
                 </executions>
                 <configuration>
                     <recompileMode>incremental</recompileMode>
+                    <args>
+                        <arg>-deprecation</arg>
+                    </args>
                 </configuration>
             </plugin>
             <!-- disable surefire -->

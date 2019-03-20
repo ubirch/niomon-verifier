@@ -16,36 +16,23 @@
 
 package com.ubirch.signatureverifier
 
-import java.time.Duration
 import java.util.UUID
 
-import akka.stream.UniqueKillSwitch
-import cakesolutions.kafka.testkit.KafkaServer
-import cakesolutions.kafka.{KafkaConsumer, KafkaProducer}
-import com.fasterxml.jackson.databind.{MapperFeature, ObjectMapper, SerializationFeature}
-import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
+import akka.Done
+import akka.kafka.scaladsl.Consumer.DrainingControl
 import com.typesafe.scalalogging.StrictLogging
 import com.ubirch.kafka.{EnvelopeDeserializer, EnvelopeSerializer, MessageEnvelope}
-import com.ubirch.protocol.{ProtocolMessage, ProtocolMessageViews}
+import com.ubirch.protocol.ProtocolMessage
 import com.ubirch.protocol.codec.{JSONProtocolDecoder, MsgPackProtocolDecoder}
+import net.manub.embeddedkafka.EmbeddedKafka
 import org.apache.commons.codec.binary.Hex
-import org.apache.kafka.clients.admin.{AdminClient, AdminClientConfig, NewTopic}
-import org.apache.kafka.clients.consumer.{ConsumerRecords, OffsetResetStrategy}
 import org.apache.kafka.clients.producer.ProducerRecord
-import org.apache.kafka.common.serialization.{StringDeserializer, StringSerializer}
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
-import scala.collection.JavaConverters._
-
 //noinspection TypeAnnotation
-class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with StrictLogging {
-  val mapper = new ObjectMapper with ScalaObjectMapper
-  mapper.registerModule(DefaultScalaModule)
-  mapper.configure(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY, true)
-  mapper.configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
-  mapper.configure(MapperFeature.DEFAULT_VIEW_INCLUSION, false)
-  mapper.setConfig(mapper.getSerializationConfig.withView(classOf[ProtocolMessageViews.WithSignedData]))
+class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with StrictLogging with EmbeddedKafka {
+  implicit val messageEnvelopeSerializer = EnvelopeSerializer
+  implicit val messageEnvelopeDeserializer = EnvelopeDeserializer
 
   "msgpack with valid signature" should "be routed to 'valid' queue" in {
     val message = Hex.decodeHex("9512b06eac4d0b16e645088c4622e7451ea5a1ccef01da0040578a5b22ceb3e1d0d0f8947c098010133b44d3b1d2ab398758ffed11507b607ed37dbbe006f645f0ed0fdbeb1b48bb50fd71d832340ce024d5a0e21c0ebc8e0e".toCharArray)
@@ -53,14 +40,13 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
     val validMessage = MessageEnvelope(pm)
     logger.info(validMessage.toString)
 
-    producer.send(new ProducerRecord("incoming", "foo", validMessage))
-    validTopicConsumer.subscribe(List("valid").asJava)
+    publishToKafka(new ProducerRecord("incoming", "foo", validMessage))
 
-    val validTopicRecords: ConsumerRecords[String, MessageEnvelope] = validTopicConsumer.poll(Duration.ofSeconds(10))
-    validTopicRecords.count() should be(1)
+    val validTopicEnvelopes = consumeNumberMessagesFrom[MessageEnvelope]("valid", 1, autoCommit = true)
+    validTopicEnvelopes.size should be(1)
 
-    val approvedMessage = validTopicRecords.iterator().next()
-    approvedMessage.value().toString should equal(validMessage.toString) // ProtocolMessage doesn't override equals :'(
+    val approvedMessage = validTopicEnvelopes.head
+    approvedMessage.toString should equal(validMessage.toString) // ProtocolMessage doesn't override equals :'(
   }
 
   "json with valid signature" should "be routed to 'valid' queue" in {
@@ -69,36 +55,31 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
     val validMessage = MessageEnvelope(pm)
     logger.info(validMessage.toString)
 
-    producer.send(new ProducerRecord("incoming", "foo", validMessage))
-    validTopicConsumer.subscribe(List("valid").asJava)
+    publishToKafka(new ProducerRecord("incoming", "foo", validMessage))
 
-    val validTopicRecords: ConsumerRecords[String, MessageEnvelope] = validTopicConsumer.poll(Duration.ofSeconds(10))
-    validTopicRecords.count() should be(1)
+    val validTopicEnvelopes = consumeNumberMessagesFrom[MessageEnvelope]("valid", 1, autoCommit = true)
+    validTopicEnvelopes.size should be(1)
 
-    val approvedMessage = validTopicRecords.iterator().next()
-    approvedMessage.value().toString should equal(validMessage.toString) // ProtocolMessage doesn't override equals :'(
+    val approvedMessage = validTopicEnvelopes.head
+    approvedMessage.toString should equal(validMessage.toString) // ProtocolMessage doesn't override equals :'(
   }
 
   "json with invalid signature " should "be routed to 'invalid' queue" in {
     val invalidMessage = MessageEnvelope(new ProtocolMessage())
-    producer.send(new ProducerRecord("incoming", "bar", invalidMessage))
-    invalidTopicConsumer.subscribe(List("invalid").asJava)
+    publishToKafka(new ProducerRecord("incoming", "bar", invalidMessage))
 
-    val invalidTopicRecords: ConsumerRecords[String, MessageEnvelope] = invalidTopicConsumer.poll(Duration.ofSeconds(10))
-    invalidTopicRecords.count() should be(1)
-    val rejectedMessage = invalidTopicRecords.iterator().next()
-    rejectedMessage.value().toString should equal(invalidMessage.toString) // ProtocolMessage doesn't override equals :'(
+    val invalidTopicEnvelopes = consumeNumberMessagesFrom[MessageEnvelope]("invalid", 1, autoCommit = true)
+    invalidTopicEnvelopes.size should be(1)
+
+    val rejectedMessage = invalidTopicEnvelopes.head
+    rejectedMessage.toString should equal(invalidMessage.toString) // ProtocolMessage doesn't override equals :'(
   }
 
-  val kafkaServer = new KafkaServer(9992)
-  val producer = createProducer(kafkaServer.kafkaPort)
-  val invalidTopicConsumer = createConsumer(kafkaServer.kafkaPort, "1")
-  val validTopicConsumer = createConsumer(kafkaServer.kafkaPort, "2")
-  var stream: UniqueKillSwitch = _
+  var microservice: SignatureVerifierMicroservice = _
+  var control: DrainingControl[Done] = _
 
   override def beforeAll(): Unit = {
-    kafkaServer.startup()
-    createTopics("incoming", "invalid", "valid")
+    EmbeddedKafka.start()
     val keyServerClient = new KeyServerClient("") {
       val knowUUID = UUID.fromString("6eac4d0b-16e6-4508-8c46-22e7451ea5a1")
 
@@ -110,50 +91,12 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
         }
       }
     }
-    stream = SignatureVerifier(new Verifier(keyServerClient)).run()
-  }
-
-  def createTopics(topicName: String*): Unit = {
-    val adminClient = createAdmin(kafkaServer.kafkaPort)
-    val topics = topicName.map(new NewTopic(_, 1, 1))
-    val createTopicsResult = adminClient.createTopics(topics.toList.asJava)
-    // finish futures
-    topicName.foreach(t => createTopicsResult.values.get(t).get())
-    adminClient.close()
-  }
-
-  private def createAdmin(kafkaPort: Int) = {
-    val configMap = Map[String, AnyRef](
-      AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG -> s"localhost:$kafkaPort",
-      AdminClientConfig.CLIENT_ID_CONFIG -> "admin",
-    )
-    AdminClient.create(configMap.asJava)
+    microservice = new SignatureVerifierMicroservice(_ => new Verifier(keyServerClient))
+    control = microservice.run
   }
 
   override def afterAll(): Unit = {
-    stream.shutdown()
-    producer.close()
-    invalidTopicConsumer.close()
-    validTopicConsumer.close()
-    kafkaServer.close()
+    EmbeddedKafka.stop()
+    control.drainAndShutdown()(microservice.system.dispatcher)
   }
-
-  private def createConsumer(kafkaPort: Int, groupId: String) = {
-    KafkaConsumer(
-      KafkaConsumer.Conf(new StringDeserializer(),
-        EnvelopeDeserializer,
-        bootstrapServers = s"localhost:$kafkaPort",
-        groupId = groupId,
-        autoOffsetReset = OffsetResetStrategy.EARLIEST)
-    )
-  }
-
-  private def createProducer(kafkaPort: Int) = {
-    KafkaProducer(
-      KafkaProducer.Conf(new StringSerializer(),
-        EnvelopeSerializer,
-        bootstrapServers = s"localhost:$kafkaPort",
-        acks = "all"))
-  }
-
 }
