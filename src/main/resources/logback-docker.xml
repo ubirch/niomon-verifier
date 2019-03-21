@@ -36,6 +36,10 @@
     </appender>
 
     <logger name="org.apache.kafka" level="WARN"/>
+    <logger name="akka.actor.TimerScheduler" level="WARN"/>
+    <logger name="org.svenson" level="WARN"/>
+    <logger name="org.apache.commons" level="WARN"/>
+    <logger name="httpclient.wire" level="WARN"/>
 
     <root level="DEBUG">
         <appender-ref ref="JSONSTDOUT"/>
