@@ -1,6 +1,5 @@
 package com.ubirch.signatureverifier
 
-import com.typesafe.config.Config
 import com.ubirch.kafka.MessageEnvelope
 import com.ubirch.niomon.base.NioMicroservice
 import com.ubirch.kafka._
@@ -9,8 +8,8 @@ import org.apache.kafka.clients.producer.ProducerRecord
 
 import scala.util.{Failure, Success, Try}
 
-class SignatureVerifierMicroservice(verifierFactory: Config => Verifier) extends NioMicroservice[MessageEnvelope, MessageEnvelope]("signature-verifier") {
-  val verifier: Verifier = verifierFactory(config)
+class SignatureVerifierMicroservice(verifierFactory: NioMicroservice.Context => Verifier) extends NioMicroservice[MessageEnvelope, MessageEnvelope]("signature-verifier") {
+  val verifier: Verifier = verifierFactory(context)
 
   override def processRecord(record: ConsumerRecord[String, MessageEnvelope]): ProducerRecord[String, MessageEnvelope] = {
     Try {

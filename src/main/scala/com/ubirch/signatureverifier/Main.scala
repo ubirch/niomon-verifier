@@ -19,8 +19,8 @@ package com.ubirch.signatureverifier
 import java.security.{InvalidKeyException, MessageDigest, SignatureException}
 import java.util.{Base64, UUID}
 
-import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
+import com.ubirch.niomon.base.NioMicroservice
 import com.ubirch.protocol.ProtocolVerifier
 import net.i2p.crypto.eddsa.spec.{EdDSANamedCurveSpec, EdDSANamedCurveTable, EdDSAPublicKeySpec}
 import net.i2p.crypto.eddsa.{EdDSAEngine, EdDSAPublicKey}
@@ -30,18 +30,19 @@ import org.json4s.{DefaultFormats, JValue}
 import skinny.http.HTTP
 
 object Main {
-  def getKeyServerUrl(conf: Config): String = {
-    val url = s"${conf.getString("ubirchKeyService.client.rest.host")}/api/keyService/v1"
-    if (url.startsWith("http://") || url.startsWith("https://")) url else s"http://$url"
-  }
-
   def main(args: Array[String]) {
-    new SignatureVerifierMicroservice(c => new Verifier(new KeyServerClient(getKeyServerUrl(c)))).runUntilDone
+    new SignatureVerifierMicroservice(c => new Verifier(new KeyServerClient(c))).runUntilDone
   }
 }
 
-class KeyServerClient(keyServerUrl: String) extends StrictLogging {
+class KeyServerClient(context: NioMicroservice.Context) extends StrictLogging {
   implicit val formats: DefaultFormats = DefaultFormats
+  val keyServerUrl: String = {
+    val url = s"${context.config.getString("ubirchKeyService.client.rest.host")}/api/keyService/v1"
+    if (url.startsWith("http://") || url.startsWith("https://")) url else s"http://$url"
+  }
+
+  lazy val getPublicKeysCached: UUID => List[Array[Byte]] = context.cached("public-keys-cache")(getPublicKeys)
 
   def getPublicKeys(uuid: UUID): List[Array[Byte]] = {
     val response = HTTP.get(keyServerUrl + "/pubkey/current/hardwareId/" + uuid.toString)
@@ -62,7 +63,7 @@ class Verifier(keyServer: KeyServerClient) extends ProtocolVerifier with StrictL
     val digest: MessageDigest = MessageDigest.getInstance("SHA-512")
     val signEngine = new EdDSAEngine(digest)
 
-    keyServer.getPublicKeys(uuid).map { pubKeyBytes =>
+    keyServer.getPublicKeysCached(uuid).map { pubKeyBytes =>
       val publicKey = new EdDSAPublicKey(new EdDSAPublicKeySpec(pubKeyBytes, spec))
 
       // create hash of message

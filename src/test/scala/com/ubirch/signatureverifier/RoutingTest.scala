@@ -22,6 +22,7 @@ import akka.Done
 import akka.kafka.scaladsl.Consumer.DrainingControl
 import com.typesafe.scalalogging.StrictLogging
 import com.ubirch.kafka.{EnvelopeDeserializer, EnvelopeSerializer, MessageEnvelope}
+import com.ubirch.niomon.base.NioMicroservice
 import com.ubirch.protocol.ProtocolMessage
 import com.ubirch.protocol.codec.{JSONProtocolDecoder, MsgPackProtocolDecoder}
 import net.manub.embeddedkafka.EmbeddedKafka
@@ -80,8 +81,11 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
 
   override def beforeAll(): Unit = {
     EmbeddedKafka.start()
-    val keyServerClient = new KeyServerClient("") {
+    val keyServerClient = (c: NioMicroservice.Context) => new KeyServerClient(c) {
       val knowUUID = UUID.fromString("6eac4d0b-16e6-4508-8c46-22e7451ea5a1")
+
+      // no caching for the tests
+      override lazy val getPublicKeysCached: UUID => scala.List[Array[Byte]] = getPublicKeys
 
       override def getPublicKeys(uuid: UUID): List[Array[Byte]] = {
         if (uuid == uuid) {
@@ -91,7 +95,7 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
         }
       }
     }
-    microservice = new SignatureVerifierMicroservice(_ => new Verifier(keyServerClient))
+    microservice = new SignatureVerifierMicroservice(c => new Verifier(keyServerClient(c)))
     control = microservice.run
   }
 
