@@ -19,10 +19,10 @@ class SignatureVerifierMicroservice(verifierFactory: NioMicroservice.Context => 
       case Success(true) => record.toProducerRecord(outputTopics("valid"))
       case Success(false) =>
         logger.warn(s"signature verification failed: $record, (Verifier.verify returned false)")
-        record.toProducerRecord(outputTopics("invalid")).withExtraHeaders("http-status-code" -> "400")
+        record.withExtraHeaders("http-status-code" -> "400").toProducerRecord(outputTopics("invalid"))
       case Failure(e) =>
         logger.warn(s"signature verification failed: $record", e)
-        record.toProducerRecord(outputTopics("invalid")).withExtraHeaders("http-status-code" -> "400")
+        record.withExtraHeaders("http-status-code" -> "400").toProducerRecord(outputTopics("invalid"))
     }
   }
 }
