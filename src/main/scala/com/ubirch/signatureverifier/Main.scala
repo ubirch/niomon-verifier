@@ -42,7 +42,8 @@ class KeyServerClient(context: NioMicroservice.Context) extends StrictLogging {
     if (url.startsWith("http://") || url.startsWith("https://")) url else s"http://$url"
   }
 
-  lazy val getPublicKeysCached: UUID => List[Array[Byte]] = context.cached("public-keys-cache")(getPublicKeys)
+  lazy val getPublicKeysCached: UUID => List[Array[Byte]] =
+    context.cached(getPublicKeys _).buildCache("public-keys-cache")
 
   def getPublicKeys(uuid: UUID): List[Array[Byte]] = {
     val response = HTTP.get(keyServerUrl + "/pubkey/current/hardwareId/" + uuid.toString)
