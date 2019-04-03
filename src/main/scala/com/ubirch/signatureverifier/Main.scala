@@ -31,7 +31,7 @@ import skinny.http.HTTP
 
 object Main {
   def main(args: Array[String]) {
-    new SignatureVerifierMicroservice(c => new Verifier(new KeyServerClient(c))).runUntilDone
+    new SignatureVerifierMicroservice(c => new Verifier(new KeyServerClient(c))).runUntilDoneAndShutdownProcess
   }
 }
 
