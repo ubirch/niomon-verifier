@@ -10,6 +10,7 @@ import scala.util.{Failure, Success, Try}
 
 class SignatureVerifierMicroservice(verifierFactory: NioMicroservice.Context => Verifier) extends NioMicroservice[MessageEnvelope, MessageEnvelope]("signature-verifier") {
   val verifier: Verifier = verifierFactory(context)
+  private val httpStatusCodeKey = "http-status-code"
 
   override def processRecord(record: ConsumerRecord[String, MessageEnvelope]): ProducerRecord[String, MessageEnvelope] = {
     Try {
@@ -19,10 +20,10 @@ class SignatureVerifierMicroservice(verifierFactory: NioMicroservice.Context => 
       case Success(true) => record.toProducerRecord(outputTopics("valid"))
       case Success(false) =>
         logger.warn(s"signature verification failed: $record, (Verifier.verify returned false)")
-        record.withExtraHeaders("http-status-code" -> "400").toProducerRecord(outputTopics("invalid"))
+        record.withExtraHeaders(httpStatusCodeKey -> "400").toProducerRecord(outputTopics("invalid"))
       case Failure(e) =>
         logger.warn(s"signature verification failed: $record", e)
-        record.withExtraHeaders("http-status-code" -> "400").toProducerRecord(outputTopics("invalid"))
+        record.withExtraHeaders(httpStatusCodeKey -> "400").toProducerRecord(outputTopics("invalid"))
     }
   }
 }
