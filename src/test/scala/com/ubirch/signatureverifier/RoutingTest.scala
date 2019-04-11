@@ -69,11 +69,11 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
     val invalidMessage = MessageEnvelope(new ProtocolMessage())
     publishToKafka(new ProducerRecord("incoming", "bar", invalidMessage))
 
-    val invalidTopicEnvelopes = consumeNumberMessagesFrom[MessageEnvelope]("invalid", 1, autoCommit = true)
+    val invalidTopicEnvelopes = consumeNumberStringMessagesFrom("invalid", 1, autoCommit = true)
     invalidTopicEnvelopes.size should be(1)
 
     val rejectedMessage = invalidTopicEnvelopes.head
-    rejectedMessage.toString should equal(invalidMessage.toString) // ProtocolMessage doesn't override equals :'(
+    rejectedMessage.toString should equal("""{"error":"NullPointerException: null","causes":[]}""")
   }
 
   var microservice: SignatureVerifierMicroservice = _
