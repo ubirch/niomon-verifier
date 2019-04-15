@@ -73,7 +73,7 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
     invalidTopicEnvelopes.size should be(1)
 
     val rejectedMessage = invalidTopicEnvelopes.head
-    rejectedMessage.toString should equal("""{"error":"NullPointerException: null","causes":[]}""")
+    rejectedMessage.toString should equal("""{"error":"NullPointerException: null","causes":[],"microservice":"signature-verifier","requestId":"bar"}""")
   }
 
   var microservice: SignatureVerifierMicroservice = _
