@@ -21,6 +21,6 @@ class SignatureVerifierMicroservice(verifierFactory: NioMicroservice.Context => 
       throw WithHttpStatus(400, e)
     }
 
-    record.toProducerRecord(outputTopics("valid"))
+    record.toProducerRecord(onlyOutputTopic)
   }
 }
