@@ -16,24 +16,18 @@
 
 package com.ubirch.signatureverifier
 
-import java.security.{InvalidKeyException, MessageDigest, SignatureException}
+import java.security.{InvalidKeyException, MessageDigest, NoSuchAlgorithmException, SignatureException}
 import java.util.{Base64, UUID}
 
 import com.typesafe.scalalogging.StrictLogging
+import com.ubirch.crypto.GeneratorKeyFactory
+import com.ubirch.crypto.utils.{Curve, Hash, Utils}
 import com.ubirch.niomon.base.NioMicroservice
 import com.ubirch.protocol.ProtocolVerifier
-import net.i2p.crypto.eddsa.spec.{EdDSANamedCurveSpec, EdDSANamedCurveTable, EdDSAPublicKeySpec}
-import net.i2p.crypto.eddsa.{EdDSAEngine, EdDSAPublicKey}
 import org.apache.commons.codec.binary.Hex
 import org.json4s.jackson.JsonMethods.parse
 import org.json4s.{DefaultFormats, JValue}
 import skinny.http.HTTP
-
-object Main {
-  def main(args: Array[String]) {
-    new SignatureVerifierMicroservice(c => new Verifier(new KeyServerClient(c))).runUntilDoneAndShutdownProcess
-  }
-}
 
 class KeyServerClient(context: NioMicroservice.Context) extends StrictLogging {
   implicit val formats: DefaultFormats = DefaultFormats
@@ -42,40 +36,54 @@ class KeyServerClient(context: NioMicroservice.Context) extends StrictLogging {
     if (url.startsWith("http://") || url.startsWith("https://")) url else s"http://$url"
   }
 
-  lazy val getPublicKeysCached: UUID => List[Array[Byte]] =
+  lazy val getPublicKeysCached: UUID => List[JValue] =
     context.cached(getPublicKeys _).buildCache("public-keys-cache")
 
-  def getPublicKeys(uuid: UUID): List[Array[Byte]] = {
+  def getPublicKeys(uuid: UUID): List[JValue] = {
     val response = HTTP.get(keyServerUrl + "/pubkey/current/hardwareId/" + uuid.toString)
-    logger.info(response.asString)
-    val keys = parse(response.asString).extract[List[JValue]]
-    keys.map(key => Base64.getDecoder.decode((key \ "pubKeyInfo" \ "pubKey").extract[String]))
+    logger.debug(s"received keys: {$uuid}: ${response.asString}")
+    parse(response.asString).extract[List[JValue]]
   }
 }
 
 class Verifier(keyServer: KeyServerClient) extends ProtocolVerifier with StrictLogging {
-  val spec: EdDSANamedCurveSpec = EdDSANamedCurveTable.getByName(EdDSANamedCurveTable.CURVE_ED25519_SHA512)
+  implicit val formats: DefaultFormats = DefaultFormats
 
-  @throws[SignatureException]
   @throws[InvalidKeyException]
+  @throws[NoSuchAlgorithmException]
   override def verify(uuid: UUID, data: Array[Byte], offset: Int, len: Int, signature: Array[Byte]): Boolean = {
     if (signature == null) throw new SignatureException("signature must not be null")
+    logger.debug(s"VRFY: d=${Hex.encodeHexString(data)}")
+    logger.debug(s"VRFY: s=${Hex.encodeHexString(signature)}")
 
-    val digest: MessageDigest = MessageDigest.getInstance("SHA-512")
-    val signEngine = new EdDSAEngine(digest)
+    keyServer.getPublicKeysCached(uuid).headOption.exists { keyInfo: JValue =>
+      val pubKeyBytes = Base64.getDecoder.decode((keyInfo \ "pubKeyInfo" \ "pubKey").extract[String])
+      (keyInfo \ "pubKeyInfo" \ "algorithm").extract[String] match {
+        case "ECC_ED25519" =>
+          // Ed25519 uses SHA512 hashed messages
+          val digest: MessageDigest = MessageDigest.getInstance("SHA-512")
+          digest.update(data, offset, len)
+          val dataToVerify = digest.digest
 
-    keyServer.getPublicKeysCached(uuid).map { pubKeyBytes =>
-      val publicKey = new EdDSAPublicKey(new EdDSAPublicKeySpec(pubKeyBytes, spec))
+          logger.debug(s"verifying ED25519: ${Hex.encodeHexString(dataToVerify)}")
+          GeneratorKeyFactory.getPubKey(pubKeyBytes, Curve.Ed25519).verify(dataToVerify, signature)
+        case "ECC_ECDSA" =>
+          // ECDSA uses SHA256 hashed messages
+          val digest: MessageDigest = MessageDigest.getInstance("SHA-256")
+          digest.update(data, offset, len)
+          val dataToVerify = digest.digest
 
-      // create hash of message
-      digest.update(data, offset, len)
-      val dataToVerify = digest.digest
+          logger.debug(s"verifying ED25519: ${Hex.encodeHexString(dataToVerify)}")
+          GeneratorKeyFactory.getPubKey(pubKeyBytes, Curve.Ed25519).verify(dataToVerify, signature)
+        case algorithm: String =>
+          throw new NoSuchAlgorithmException(s"unsupported algorithm: $algorithm")
+      }
+    }
+  }
+}
 
-      // verify signature using the hash
-      signEngine.initVerify(publicKey)
-      signEngine.update(dataToVerify, 0, dataToVerify.length)
-      logger.debug(s"VRFY: (${signature.length}) ${Hex.encodeHexString(signature)}")
-      signEngine.verify(signature)
-    }.headOption.getOrElse(false)
+object Main {
+  def main(args: Array[String]) {
+    new SignatureVerifierMicroservice(c => new Verifier(new KeyServerClient(c))).runUntilDoneAndShutdownProcess
   }
 }
