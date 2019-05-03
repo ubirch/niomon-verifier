@@ -83,7 +83,6 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
   override def beforeAll(): Unit = {
     EmbeddedKafka.start()
     val keyServerClient = (c: NioMicroservice.Context) => new KeyServerClient(c) {
-      val knownUUID = UUID.fromString("6eac4d0b-16e6-4508-8c46-22e7451ea5a1")
       val knownKey = new String(Base64.encodeBase64(Hex.decodeHex("b12a906051f102881bbb487ee8264aa05d8d0fcc51218f2a47f562ceb9b0d068")))
 
       // no caching for the tests
@@ -92,10 +91,12 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
       override def getPublicKeys(uuid: UUID): List[JValue] = {
         import org.json4s.JsonDSL._
 
-        if (uuid == knownUUID) {
-          List("pubKeyInfo" -> ("algorithm" -> "ECC_ED25519") ~ ("pubKey" -> knownKey))
-        } else {
-          Nil
+        uuid.toString match {
+          case "6eac4d0b-16e6-4508-8c46-22e7451ea5a1" =>
+            List("pubKeyInfo" -> ("algorithm" -> "ECC_ED25519") ~ ("pubKey" -> knownKey))
+          case "" =>
+            Nil
+          case _ => Nil
         }
       }
     }
