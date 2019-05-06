@@ -46,6 +46,7 @@ class KeyServerClient(context: NioMicroservice.Context) extends StrictLogging {
   }
 }
 
+// TODO: this is also in the verification-microservice, extract this to a common lib (ubirch-crypto maybe?)
 class Verifier(keyServer: KeyServerClient) extends ProtocolVerifier with StrictLogging {
   implicit val formats: DefaultFormats = DefaultFormats
 
