@@ -21,7 +21,7 @@ import java.util.{Base64, UUID}
 
 import com.typesafe.scalalogging.StrictLogging
 import com.ubirch.crypto.GeneratorKeyFactory
-import com.ubirch.crypto.utils.{Curve, Hash, Utils}
+import com.ubirch.crypto.utils.Curve
 import com.ubirch.niomon.base.NioMicroservice
 import com.ubirch.protocol.ProtocolVerifier
 import org.apache.commons.codec.binary.Hex
@@ -60,7 +60,7 @@ class Verifier(keyServer: KeyServerClient) extends ProtocolVerifier with StrictL
     keyServer.getPublicKeysCached(uuid).headOption.exists { keyInfo: JValue =>
       val pubKeyBytes = Base64.getDecoder.decode((keyInfo \ "pubKeyInfo" \ "pubKey").extract[String])
       (keyInfo \ "pubKeyInfo" \ "algorithm").extract[String] match {
-        case "ECC_ED25519" =>
+        case a if "ECC_ED25519" =>
           // Ed25519 uses SHA512 hashed messages
           val digest: MessageDigest = MessageDigest.getInstance("SHA-512")
           digest.update(data, offset, len)
@@ -68,7 +68,7 @@ class Verifier(keyServer: KeyServerClient) extends ProtocolVerifier with StrictL
 
           logger.debug(s"verifying ED25519: ${Hex.encodeHexString(dataToVerify)}")
           GeneratorKeyFactory.getPubKey(pubKeyBytes, Curve.Ed25519).verify(dataToVerify, signature)
-        case "ECC_ECDSA" =>
+        case a if a == "ECC_ECDSA" || a == "ecdsa-p256v1" =>
           // ECDSA uses SHA256 hashed messages
           val digest: MessageDigest = MessageDigest.getInstance("SHA-256")
           digest.update(data, offset, len)
