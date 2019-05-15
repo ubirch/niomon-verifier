@@ -60,7 +60,7 @@ class Verifier(keyServer: KeyServerClient) extends ProtocolVerifier with StrictL
     keyServer.getPublicKeysCached(uuid).headOption.exists { keyInfo: JValue =>
       val pubKeyBytes = Base64.getDecoder.decode((keyInfo \ "pubKeyInfo" \ "pubKey").extract[String])
       (keyInfo \ "pubKeyInfo" \ "algorithm").extract[String] match {
-        case a if "ECC_ED25519" =>
+        case "ECC_ED25519" =>
           // Ed25519 uses SHA512 hashed messages
           val digest: MessageDigest = MessageDigest.getInstance("SHA-512")
           digest.update(data, offset, len)
