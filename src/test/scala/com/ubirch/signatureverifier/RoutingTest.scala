@@ -16,7 +16,7 @@
 
 package com.ubirch.signatureverifier
 
-import java.util.UUID
+import java.util.{Base64, UUID}
 
 import akka.Done
 import akka.kafka.scaladsl.Consumer.DrainingControl
@@ -26,7 +26,6 @@ import com.ubirch.niomon.base.NioMicroservice
 import com.ubirch.protocol.ProtocolMessage
 import com.ubirch.protocol.codec.{JSONProtocolDecoder, MsgPackProtocolDecoder}
 import net.manub.embeddedkafka.EmbeddedKafka
-import org.apache.commons.codec.binary.{Base64, Hex}
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.json4s.JValue
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
@@ -37,7 +36,7 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
   implicit val messageEnvelopeDeserializer = EnvelopeDeserializer
 
   "msgpack with valid signature" should "be routed to 'valid' queue" in {
-    val message = Hex.decodeHex("9512b06eac4d0b16e645088c4622e7451ea5a1ccef01da0040578a5b22ceb3e1d0d0f8947c098010133b44d3b1d2ab398758ffed11507b607ed37dbbe006f645f0ed0fdbeb1b48bb50fd71d832340ce024d5a0e21c0ebc8e0e".toCharArray)
+    val message = Base64.getDecoder.decode("lRKwbqxNCxbmRQiMRiLnRR6loczvAdoAQFeKWyLOs+HQ0PiUfAmAEBM7RNOx0qs5h1j/7RFQe2B+03274Ab2RfDtD9vrG0i7UP1x2DI0DOAk1aDiHA68jg4=")
     val pm = MsgPackProtocolDecoder.getDecoder.decode(message)
     val validMessage = MessageEnvelope(pm)
     logger.info(validMessage.toString)
@@ -83,7 +82,7 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
   override def beforeAll(): Unit = {
     EmbeddedKafka.start()
     val keyServerClient = (c: NioMicroservice.Context) => new KeyServerClient(c) {
-      val knownKey = new String(Base64.encodeBase64(Hex.decodeHex("b12a906051f102881bbb487ee8264aa05d8d0fcc51218f2a47f562ceb9b0d068")))
+      val knownKey = "sSqQYFHxAogbu0h+6CZKoF2ND8xRIY8qR/Vizrmw0Gg="
 
       // no caching for the tests
       override lazy val getPublicKeysCached: UUID => List[JValue] = getPublicKeys

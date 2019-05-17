@@ -24,7 +24,6 @@ import com.ubirch.crypto.GeneratorKeyFactory
 import com.ubirch.crypto.utils.Curve
 import com.ubirch.niomon.base.NioMicroservice
 import com.ubirch.protocol.ProtocolVerifier
-import org.apache.commons.codec.binary.Hex
 import org.json4s.jackson.JsonMethods.parse
 import org.json4s.{DefaultFormats, JValue}
 import skinny.http.HTTP
@@ -54,8 +53,8 @@ class Verifier(keyServer: KeyServerClient) extends ProtocolVerifier with StrictL
   @throws[NoSuchAlgorithmException]
   override def verify(uuid: UUID, data: Array[Byte], offset: Int, len: Int, signature: Array[Byte]): Boolean = {
     if (signature == null) throw new SignatureException("signature must not be null")
-    logger.debug(s"VRFY: d=${Hex.encodeHexString(data)}")
-    logger.debug(s"VRFY: s=${Hex.encodeHexString(signature)}")
+    logger.debug(s"VRFY: d=${Base64.getEncoder.encodeToString(data)}")
+    logger.debug(s"VRFY: s=${Base64.getEncoder.encodeToString(signature)}")
 
     keyServer.getPublicKeysCached(uuid).headOption.exists { keyInfo: JValue =>
       val pubKeyBytes = Base64.getDecoder.decode((keyInfo \ "pubKeyInfo" \ "pubKey").extract[String])
@@ -66,7 +65,7 @@ class Verifier(keyServer: KeyServerClient) extends ProtocolVerifier with StrictL
           digest.update(data, offset, len)
           val dataToVerify = digest.digest
 
-          logger.debug(s"verifying ED25519: ${Hex.encodeHexString(dataToVerify)}")
+          logger.debug(s"verifying ED25519: ${Base64.getEncoder.encodeToString(dataToVerify)}")
           GeneratorKeyFactory.getPubKey(pubKeyBytes, Curve.Ed25519).verify(dataToVerify, signature)
         case a if a == "ECC_ECDSA" || a == "ecdsa-p256v1" =>
           // ECDSA uses SHA256 hashed messages
@@ -74,7 +73,7 @@ class Verifier(keyServer: KeyServerClient) extends ProtocolVerifier with StrictL
           digest.update(data, offset, len)
           val dataToVerify = digest.digest
 
-          logger.debug(s"verifying ED25519: ${Hex.encodeHexString(dataToVerify)}")
+          logger.debug(s"verifying ED25519: ${Base64.getEncoder.encodeToString(dataToVerify)}")
           GeneratorKeyFactory.getPubKey(pubKeyBytes, Curve.Ed25519).verify(dataToVerify, signature)
         case algorithm: String =>
           throw new NoSuchAlgorithmException(s"unsupported algorithm: $algorithm")
@@ -84,7 +83,7 @@ class Verifier(keyServer: KeyServerClient) extends ProtocolVerifier with StrictL
 }
 
 object Main {
-  def main(args: Array[String]) {
-    new SignatureVerifierMicroservice(c => new Verifier(new KeyServerClient(c))).runUntilDoneAndShutdownProcess
+  def main(args: Array[String]): Unit = {
+    val _ = new SignatureVerifierMicroservice(c => new Verifier(new KeyServerClient(c))).runUntilDoneAndShutdownProcess
   }
 }
