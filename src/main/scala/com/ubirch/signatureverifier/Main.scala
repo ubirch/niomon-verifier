@@ -54,8 +54,8 @@ class Verifier(keyServer: KeyServerClient) extends ProtocolVerifier with StrictL
   @throws[NoSuchAlgorithmException]
   override def verify(uuid: UUID, data: Array[Byte], offset: Int, len: Int, signature: Array[Byte]): Boolean = {
     if (signature == null) throw new SignatureException("signature must not be null")
-    logger.debug(s"VRFY: d=${Hex.encodeHexString(data)}")
-    logger.debug(s"VRFY: s=${Hex.encodeHexString(signature)}")
+    logger.debug(s"DATA: d=${Hex.encodeHexString(data)}")
+    logger.debug(s"SIGN: s=${Hex.encodeHexString(signature)}")
 
     keyServer.getPublicKeysCached(uuid).headOption.exists { keyInfo: JValue =>
       val pubKeyBytes = Base64.getDecoder.decode((keyInfo \ "pubKeyInfo" \ "pubKey").extract[String])
@@ -74,8 +74,8 @@ class Verifier(keyServer: KeyServerClient) extends ProtocolVerifier with StrictL
           digest.update(data, offset, len)
           val dataToVerify = digest.digest
 
-          logger.debug(s"verifying ED25519: ${Hex.encodeHexString(dataToVerify)}")
-          GeneratorKeyFactory.getPubKey(pubKeyBytes, Curve.Ed25519).verify(dataToVerify, signature)
+          logger.debug(s"verifying ECDSA: ${Hex.encodeHexString(dataToVerify)}")
+          GeneratorKeyFactory.getPubKey(pubKeyBytes, Curve.PRIME256V1).verify(dataToVerify, signature)
         case algorithm: String =>
           throw new NoSuchAlgorithmException(s"unsupported algorithm: $algorithm")
       }
