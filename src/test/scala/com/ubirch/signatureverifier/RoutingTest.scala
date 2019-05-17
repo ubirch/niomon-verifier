@@ -105,6 +105,6 @@ class RoutingTest extends FlatSpec with Matchers with BeforeAndAfterAll with Str
 
   override def afterAll(): Unit = {
     EmbeddedKafka.stop()
-    control.drainAndShutdown()(microservice.system.dispatcher)
+    val _ = control.drainAndShutdown()(microservice.system.dispatcher)
   }
 }
