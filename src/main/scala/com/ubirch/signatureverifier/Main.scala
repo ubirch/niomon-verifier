@@ -22,7 +22,7 @@ import java.util.{Base64, UUID}
 import com.typesafe.scalalogging.StrictLogging
 import com.ubirch.crypto.GeneratorKeyFactory
 import com.ubirch.crypto.utils.Curve
-import com.ubirch.niomon.base.NioMicroservice
+import com.ubirch.niomon.base.{NioMicroservice, NioMicroserviceLive}
 import com.ubirch.protocol.ProtocolVerifier
 import org.json4s.jackson.JsonMethods.parse
 import org.json4s.{DefaultFormats, JValue}
@@ -84,6 +84,9 @@ class Verifier(keyServer: KeyServerClient) extends ProtocolVerifier with StrictL
 
 object Main {
   def main(args: Array[String]): Unit = {
-    val _ = new SignatureVerifierMicroservice(c => new Verifier(new KeyServerClient(c))).runUntilDoneAndShutdownProcess
+    val _ = NioMicroserviceLive(
+      "signature-verifier",
+      SignatureVerifierMicroservice(c => new Verifier(new KeyServerClient(c)))
+    ).runUntilDoneAndShutdownProcess
   }
 }

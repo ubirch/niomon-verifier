@@ -3,12 +3,15 @@ package com.ubirch.signatureverifier
 import java.security.SignatureException
 
 import com.ubirch.kafka.{MessageEnvelope, _}
-import com.ubirch.niomon.base.NioMicroservice
+import com.ubirch.niomon.base.{NioMicroservice, NioMicroserviceLogic}
 import com.ubirch.niomon.base.NioMicroservice.WithHttpStatus
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.ProducerRecord
 
-class SignatureVerifierMicroservice(verifierFactory: NioMicroservice.Context => Verifier) extends NioMicroservice[MessageEnvelope, MessageEnvelope]("signature-verifier") {
+class SignatureVerifierMicroservice(
+  verifierFactory: NioMicroservice.Context => Verifier,
+  runtime: NioMicroservice[MessageEnvelope, MessageEnvelope]
+) extends NioMicroserviceLogic(runtime) {
   val verifier: Verifier = verifierFactory(context)
   override def processRecord(record: ConsumerRecord[String, MessageEnvelope]): ProducerRecord[String, MessageEnvelope] = {
     // try ... catch is here, because `verifier.verify` may also throw
@@ -23,4 +26,10 @@ class SignatureVerifierMicroservice(verifierFactory: NioMicroservice.Context => 
 
     record.toProducerRecord(onlyOutputTopic)
   }
+}
+
+object SignatureVerifierMicroservice {
+  def apply(verifierFactory: NioMicroservice.Context => Verifier)
+    (runtime: NioMicroservice[MessageEnvelope, MessageEnvelope]): SignatureVerifierMicroservice =
+    new SignatureVerifierMicroservice(verifierFactory, runtime)
 }
