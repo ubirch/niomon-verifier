@@ -36,7 +36,7 @@ class KeyServerClient(context: NioMicroservice.Context) extends StrictLogging {
   }
 
   lazy val getPublicKeysCached: UUID => List[JValue] =
-    context.cached(getPublicKeys _).buildCache("public-keys-cache")
+    context.cached(getPublicKeys _).buildCache("public-keys-cache", shouldCache = _.nonEmpty)
 
   def getPublicKeys(uuid: UUID): List[JValue] = {
     val response = HTTP.get(keyServerUrl + "/pubkey/current/hardwareId/" + uuid.toString)
@@ -56,28 +56,29 @@ class Verifier(keyServer: KeyServerClient) extends ProtocolVerifier with StrictL
     logger.debug(s"VRFY: d=${Base64.getEncoder.encodeToString(data)}")
     logger.debug(s"VRFY: s=${Base64.getEncoder.encodeToString(signature)}")
 
-    keyServer.getPublicKeysCached(uuid).headOption.exists { keyInfo: JValue =>
-      val pubKeyBytes = Base64.getDecoder.decode((keyInfo \ "pubKeyInfo" \ "pubKey").extract[String])
-      (keyInfo \ "pubKeyInfo" \ "algorithm").extract[String] match {
-        case "ECC_ED25519" =>
-          // Ed25519 uses SHA512 hashed messages
-          val digest: MessageDigest = MessageDigest.getInstance("SHA-512")
-          digest.update(data, offset, len)
-          val dataToVerify = digest.digest
+    keyServer.getPublicKeysCached(uuid).headOption match {
+      case Some(keyInfo) => val pubKeyBytes = Base64.getDecoder.decode((keyInfo \ "pubKeyInfo" \ "pubKey").extract[String])
+        (keyInfo \ "pubKeyInfo" \ "algorithm").extract[String] match {
+          case "ECC_ED25519" =>
+            // Ed25519 uses SHA512 hashed messages
+            val digest: MessageDigest = MessageDigest.getInstance("SHA-512")
+            digest.update(data, offset, len)
+            val dataToVerify = digest.digest
 
-          logger.debug(s"verifying ED25519: ${Base64.getEncoder.encodeToString(dataToVerify)}")
-          GeneratorKeyFactory.getPubKey(pubKeyBytes, Curve.Ed25519).verify(dataToVerify, signature)
-        case a if a == "ECC_ECDSA" || a == "ecdsa-p256v1" =>
-          // ECDSA uses SHA256 hashed messages
-          val digest: MessageDigest = MessageDigest.getInstance("SHA-256")
-          digest.update(data, offset, len)
-          val dataToVerify = digest.digest
+            logger.debug(s"verifying ED25519: ${Base64.getEncoder.encodeToString(dataToVerify)}")
+            GeneratorKeyFactory.getPubKey(pubKeyBytes, Curve.Ed25519).verify(dataToVerify, signature)
+          case a if a == "ECC_ECDSA" || a == "ecdsa-p256v1" =>
+            // ECDSA uses SHA256 hashed messages
+            val digest: MessageDigest = MessageDigest.getInstance("SHA-256")
+            digest.update(data, offset, len)
+            val dataToVerify = digest.digest
 
-          logger.debug(s"verifying ED25519: ${Base64.getEncoder.encodeToString(dataToVerify)}")
-          GeneratorKeyFactory.getPubKey(pubKeyBytes, Curve.Ed25519).verify(dataToVerify, signature)
-        case algorithm: String =>
-          throw new NoSuchAlgorithmException(s"unsupported algorithm: $algorithm")
-      }
+            logger.debug(s"verifying ED25519: ${Base64.getEncoder.encodeToString(dataToVerify)}")
+            GeneratorKeyFactory.getPubKey(pubKeyBytes, Curve.Ed25519).verify(dataToVerify, signature)
+          case algorithm: String =>
+            throw new NoSuchAlgorithmException(s"unsupported algorithm: $algorithm")
+        }
+      case None => throw new NoSuchElementException("public key not found")
     }
   }
 }
