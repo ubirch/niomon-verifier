@@ -68,10 +68,8 @@ class Verifier(keyServer: KeyServerClient) extends ProtocolVerifier with StrictL
             logger.debug(s"verifying ED25519: ${Base64.getEncoder.encodeToString(dataToVerify)}")
             GeneratorKeyFactory.getPubKey(pubKeyBytes, Curve.Ed25519).verify(dataToVerify, signature)
           case a if a == "ECC_ECDSA" || a == "ecdsa-p256v1" =>
-            // ECDSA uses SHA256 hashed messages
-            val digest: MessageDigest = MessageDigest.getInstance("SHA-256")
-            digest.update(data, offset, len)
-            val dataToVerify = digest.digest
+            val dataToVerify = new Array[Byte](len)
+            System.arraycopy(data, offset, dataToVerify, 0, len)
 
             logger.debug(s"verifying ED25519: ${Base64.getEncoder.encodeToString(dataToVerify)}")
             GeneratorKeyFactory.getPubKey(pubKeyBytes, Curve.Ed25519).verify(dataToVerify, signature)
