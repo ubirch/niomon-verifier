@@ -45,6 +45,8 @@ class RoutingTest extends FlatSpec with Matchers with StrictLogging {
       uuid.toString match {
         case "6eac4d0b-16e6-4508-8c46-22e7451ea5a1" =>
           List("pubKeyInfo" -> ("algorithm" -> "ECC_ED25519") ~ ("pubKey" -> knownKey))
+        case "ffff160c-6117-5b89-ac98-15aeb52655e0" =>
+          List("pubKeyInfo" -> ("algorithm" -> "ecdsa-p256v1") ~ ("pubKey" -> "kvdvWQ7NOT+HLDcrFqP/UZWy4QVcjfmmkfyzAgg8bitaK/FbHUPeqEji0UmCSlyPk5+4mEaEiZAHnJKOyqUZxA=="))
         case "" =>
           Nil
         case _ => Nil
@@ -98,5 +100,20 @@ class RoutingTest extends FlatSpec with Matchers with StrictLogging {
 
     val rejectedMessage = invalidTopicEnvelopes.head
     rejectedMessage.toString should equal("""{"error":"NullPointerException: null","causes":[],"microservice":"signature-verifier","requestId":"bar"}""")
+  }
+
+  "ecdsa verification" should "work" in {
+    val message = Base64.getDecoder.decode("lSLEEP//FgxhF1uJrJgVrrUmVeAAxECUnW4kkga5FhldAMYFX7s8ZUTQwYZpV3ObvNKa27c+wVoGfmGN9zQwPbl2hXBq2femGe6NzSjUtQwAIVMXrERexEBKdNrNNjCpzGR/PwNNxxIwjFL++EEoSquEAyW/JW5cPblVnxC+rIgt4+0gUFbWy5IAZcOmmvtDFeP/u/G1lIU7")
+    val pm = MsgPackProtocolDecoder.getDecoder.decode(message)
+    val validMessage = MessageEnvelope(pm)
+    logger.info(validMessage.toString)
+
+    publishToKafka(new ProducerRecord("incoming", "foo", validMessage))
+
+    val validTopicEnvelopes = consumeNumberMessagesFrom[MessageEnvelope]("valid", 1, autoCommit = true)
+    validTopicEnvelopes.size should be(1)
+
+    val approvedMessage = validTopicEnvelopes.head
+    approvedMessage.toString should equal(validMessage.toString) // ProtocolMessage doesn't override equals :'(
   }
 }
