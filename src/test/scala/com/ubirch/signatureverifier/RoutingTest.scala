@@ -105,9 +105,11 @@ class RoutingTest extends FlatSpec with Matchers with StrictLogging {
   "ecdsa verification" should "work" in {
     val message = Base64.getDecoder.decode("lSLEEP//FgxhF1uJrJgVrrUmVeAAxECUnW4kkga5FhldAMYFX7s8ZUTQwYZpV3ObvNKa27c+wVoGfmGN9zQwPbl2hXBq2femGe6NzSjUtQwAIVMXrERexEBKdNrNNjCpzGR/PwNNxxIwjFL++EEoSquEAyW/JW5cPblVnxC+rIgt4+0gUFbWy5IAZcOmmvtDFeP/u/G1lIU7")
     val pm = MsgPackProtocolDecoder.getDecoder.decode(message)
-    val validMessage = MessageEnvelope(pm)
-    logger.info(validMessage.toString)
 
+    logger.debug(Base64.getEncoder.encodeToString(pm.getSigned))
+    logger.debug(Base64.getEncoder.encodeToString(pm.getSignature))
+
+    val validMessage = MessageEnvelope(pm)
     publishToKafka(new ProducerRecord("incoming", "foo", validMessage))
 
     val validTopicEnvelopes = consumeNumberMessagesFrom[MessageEnvelope]("valid", 1, autoCommit = true)
