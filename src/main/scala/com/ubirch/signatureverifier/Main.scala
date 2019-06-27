@@ -57,7 +57,8 @@ class Verifier(keyServer: KeyServerClient) extends ProtocolVerifier with StrictL
     logger.debug(s"SIGN: s=${Base64.getEncoder.encodeToString(signature)}")
 
     keyServer.getPublicKeysCached(uuid).headOption match {
-      case Some(keyInfo) => val pubKeyBytes = Base64.getDecoder.decode((keyInfo \ "pubKeyInfo" \ "pubKey").extract[String])
+      case Some(keyInfo) =>
+        val pubKeyBytes = Base64.getDecoder.decode((keyInfo \ "pubKeyInfo" \ "pubKey").extract[String])
         (keyInfo \ "pubKeyInfo" \ "algorithm").extract[String] match {
           case "ECC_ED25519" =>
             // Ed25519 uses SHA512 hashed messages
@@ -76,7 +77,7 @@ class Verifier(keyServer: KeyServerClient) extends ProtocolVerifier with StrictL
           case algorithm: String =>
             throw new NoSuchAlgorithmException(s"unsupported algorithm: $algorithm")
         }
-      case None => throw new NoSuchElementException("public key not found")
+      case None => throw new NoSuchElementException(s"Public key not found for deviceId: [$uuid]")
     }
   }
 }
