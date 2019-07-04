@@ -20,12 +20,14 @@ import java.util.{Base64, UUID}
 
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
+import com.ubirch.client.protocol.DefaultProtocolVerifier
+import com.ubirch.client.util.curveFromString
+import com.ubirch.crypto.{GeneratorKeyFactory, PubKey}
 import com.ubirch.kafka.{EnvelopeDeserializer, EnvelopeSerializer, MessageEnvelope}
 import com.ubirch.niomon.base.{NioMicroservice, NioMicroserviceMock}
 import com.ubirch.protocol.ProtocolMessage
 import com.ubirch.protocol.codec.{JSONProtocolDecoder, MsgPackProtocolDecoder}
 import org.apache.kafka.clients.producer.ProducerRecord
-import org.json4s.JValue
 import org.scalatest.{FlatSpec, Matchers}
 
 //noinspection TypeAnnotation
@@ -33,27 +35,27 @@ class RoutingTest extends FlatSpec with Matchers with StrictLogging {
   implicit val messageEnvelopeSerializer = EnvelopeSerializer
   implicit val messageEnvelopeDeserializer = EnvelopeDeserializer
 
-  val keyServerClient = (c: NioMicroservice.Context) => new KeyServerClient(c) {
-    val knownKey = "sSqQYFHxAogbu0h+6CZKoF2ND8xRIY8qR/Vizrmw0Gg="
+  val keyServerClient = (c: NioMicroservice.Context) => new CachingUbirchKeyService(c) {
+    val eddsaKey = GeneratorKeyFactory.getPubKey(
+      Base64.getDecoder.decode("sSqQYFHxAogbu0h+6CZKoF2ND8xRIY8qR/Vizrmw0Gg="),
+      curveFromString("ECC_ED25519")
+    )
 
-    // no caching for the tests
-    override lazy val getPublicKeysCached: UUID => List[JValue] = getPublicKeys
+    val ecdsaKey = GeneratorKeyFactory.getPubKey(
+      Base64.getDecoder.decode("kvdvWQ7NOT+HLDcrFqP/UZWy4QVcjfmmkfyzAgg8bitaK/FbHUPeqEji0UmCSlyPk5+4mEaEiZAHnJKOyqUZxA=="),
+      curveFromString("ecdsa-p256v1")
+    )
 
-    override def getPublicKeys(uuid: UUID): List[JValue] = {
-      import org.json4s.JsonDSL._
-
+    override def getPublicKey(uuid: UUID): Option[PubKey] = {
       uuid.toString match {
-        case "6eac4d0b-16e6-4508-8c46-22e7451ea5a1" =>
-          List("pubKeyInfo" -> ("algorithm" -> "ECC_ED25519") ~ ("pubKey" -> knownKey))
-        case "ffff160c-6117-5b89-ac98-15aeb52655e0" =>
-          List("pubKeyInfo" -> ("algorithm" -> "ecdsa-p256v1") ~ ("pubKey" -> "kvdvWQ7NOT+HLDcrFqP/UZWy4QVcjfmmkfyzAgg8bitaK/FbHUPeqEji0UmCSlyPk5+4mEaEiZAHnJKOyqUZxA=="))
-        case "" =>
-          Nil
-        case _ => Nil
+        case "6eac4d0b-16e6-4508-8c46-22e7451ea5a1" => Some(eddsaKey)
+        case "ffff160c-6117-5b89-ac98-15aeb52655e0" => Some(ecdsaKey)
+        case _ => None
       }
     }
   }
-  val microservice = NioMicroserviceMock(SignatureVerifierMicroservice(c => new Verifier(keyServerClient(c))))
+
+  val microservice = NioMicroserviceMock(SignatureVerifierMicroservice(c => new DefaultProtocolVerifier(keyServerClient(c))))
   microservice.outputTopics = Map("valid" -> "valid")
   microservice.errorTopic = Some("invalid")
   microservice.config = ConfigFactory.load().getConfig("signature-verifier")
