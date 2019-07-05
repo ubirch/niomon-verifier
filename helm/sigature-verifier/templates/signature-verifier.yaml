@@ -1,0 +1,30 @@
+{{- define "signature-verifier.env" -}}
+- name: UBIRCH_KEYSERVICE_URL
+  value: "{{ .Values.keyServiceURL }}"
+- name: KAFKA_TOPIC_IN
+  value: "json.decoded"
+- name: KAFKA_TOPIC_OUT_VALID
+  value: "json.validated"
+- name: KAFKA_TOPIC_OUT_INVALID
+  value: "niomon.error"
+- name: REDIS_MASTER_URL
+  value: "{{.Values.redis.masterURL}}"
+- name: REDIS_SLAVE_URL
+  value: "{{.Values.redis.slaveURL}}"
+- name: REDIS_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      key: redis-password
+      name: {{.Values.redisSecretName}}
+{{- end -}}
+
+{{- $deployment := (dict "envStr" (include "signature-verifier.env" .)) -}}
+
+{{- $_ := set $deployment "Root" . -}}
+{{- $_ := set $deployment "name" "signature-verifier" -}}
+
+{{ template "niomon.deployment" $deployment }}
+
+---
+
+{{ template "niomon.service" $deployment }}
