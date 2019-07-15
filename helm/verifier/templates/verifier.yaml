@@ -1,4 +1,4 @@
-{{- define "signature-verifier.env" -}}
+{{- define "niomon-verifier.env" -}}
 - name: UBIRCH_KEYSERVICE_URL
   value: "{{ .Values.keyServiceURL }}"
 - name: KAFKA_TOPIC_IN
@@ -18,10 +18,10 @@
       name: {{.Values.redisSecretName}}
 {{- end -}}
 
-{{- $deployment := (dict "envStr" (include "signature-verifier.env" .)) -}}
+{{- $deployment := (dict "envStr" (include "niomon-verifier.env" .)) -}}
 
 {{- $_ := set $deployment "Root" . -}}
-{{- $_ := set $deployment "name" "signature-verifier" -}}
+{{- $_ := set $deployment "name" "niomon-verifier" -}}
 
 {{ template "niomon.deployment" $deployment }}
 

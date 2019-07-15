@@ -22,7 +22,7 @@ import com.ubirch.niomon.base.NioMicroserviceLive
 object Main {
   def main(args: Array[String]): Unit = {
     val _ = NioMicroserviceLive(
-      "signature-verifier",
+      "niomon-verifier",
       SignatureVerifierMicroservice(c => new DefaultProtocolVerifier(new CachingUbirchKeyService(c)))
     ).runUntilDoneAndShutdownProcess
   }
