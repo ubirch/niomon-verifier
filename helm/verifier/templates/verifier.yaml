@@ -21,7 +21,7 @@
 {{- $deployment := (dict "envStr" (include "niomon-verifier.env" .)) -}}
 
 {{- $_ := set $deployment "Root" . -}}
-{{- $_ := set $deployment "name" "niomon-verifier" -}}
+{{- $_ := set $deployment "name" "verifier" -}}
 
 {{ template "niomon.deployment" $deployment }}
 
