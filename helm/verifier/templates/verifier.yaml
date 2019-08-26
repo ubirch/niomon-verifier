@@ -2,11 +2,11 @@
 - name: UBIRCH_KEYSERVICE_URL
   value: "{{ .Values.keyServiceURL }}"
 - name: KAFKA_TOPIC_IN
-  value: "json.decoded"
+  value: "ubirch-niomon-msg-decoded-json"
 - name: KAFKA_TOPIC_OUT_VALID
-  value: "json.validated"
+  value: "ubirch-niomon-msg-validated-json"
 - name: KAFKA_TOPIC_OUT_INVALID
-  value: "niomon.error"
+  value: "ubirch-niomon-error-json"
 - name: REDIS_MASTER_URL
   value: "{{.Values.redis.masterURL}}"
 - name: REDIS_SLAVE_URL
@@ -22,6 +22,7 @@
 
 {{- $_ := set $deployment "Root" . -}}
 {{- $_ := set $deployment "name" "verifier" -}}
+  {{- $_ := set $deployment "replicas" .Values.verifier.replicas -}}
 
 {{ template "niomon.deployment" $deployment }}
 
