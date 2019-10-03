@@ -51,12 +51,12 @@ class RoutingTest extends FlatSpec with Matchers with StrictLogging {
       curveFromString("ecdsa-p256v1")
     )
 
-    override def getPublicKey(uuid: UUID): Option[PubKey] = {
+    override def getPublicKey(uuid: UUID): List[PubKey] = {
       uuid.toString match {
-        case "6eac4d0b-16e6-4508-8c46-22e7451ea5a1" => Some(eddsaKey)
-        case "ffff160c-6117-5b89-ac98-15aeb52655e0" => Some(ecdsaKey)
-        case "30aea484-3b2c-1223-3445-566778899aab" => Some(waldisKey)
-        case _ => None
+        case "6eac4d0b-16e6-4508-8c46-22e7451ea5a1" => List(eddsaKey)
+        case "ffff160c-6117-5b89-ac98-15aeb52655e0" => List(ecdsaKey)
+        case "30aea484-3b2c-1223-3445-566778899aab" => List(waldisKey)
+        case _ => Nil
       }
     }
   }

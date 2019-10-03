@@ -11,8 +11,8 @@ class CachingUbirchKeyService(context: NioMicroservice.Context) extends UbirchKe
   val url = context.config.getString("ubirchKeyService.client.rest.host")
   if (url.startsWith("http://") || url.startsWith("https://")) url else s"http://$url"
 }) with StrictLogging {
-  lazy val getPublicKeysCached: UUID => Option[PubKey] =
-    context.cached(super.getPublicKey _).buildCache("public-keys-cache", shouldCache = _.isDefined)
+  lazy val getPublicKeysCached: UUID => List[PubKey] =
+    context.cached(super.getPublicKey _).buildCache("public-keys-cache", shouldCache = _.nonEmpty)
 
-  override def getPublicKey(uuid: UUID): Option[PubKey] = getPublicKeysCached(uuid)
+  override def getPublicKey(uuid: UUID): List[PubKey] = getPublicKeysCached(uuid)
 }
