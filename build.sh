@@ -5,4 +5,5 @@ set -e
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 cd ${DIR}
 
-mvn deploy -Dbuild.number=${BUILD_NUM:-devbuild} $@
+BUILD_NUM=${$1:-devbuild}
+mvn deploy -Dbuild.number=${BUILD_NUM} $@
