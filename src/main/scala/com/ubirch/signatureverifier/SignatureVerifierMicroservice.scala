@@ -23,6 +23,7 @@ class SignatureVerifierMicroservice(
   import SignatureVerifierMicroservice._
 
   val verifier: ProtocolVerifier = verifierFactory(context)
+  // this cache is shared with verification-microservice (not a part of niomon) for faster verification on its side
   private val uppCache: RMapCache[Array[Byte], String] = context.redisCache.redisson.getMapCache("verifier-upp-cache")
   private val uppTtl = config.getDuration("verifier-upp-cache.timeToLive")
   private val uppMaxIdleTime = config.getDuration("verifier-upp-cache.maxIdleTime")
