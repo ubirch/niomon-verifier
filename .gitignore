@@ -1,5 +1,4 @@
 /target
-/Dockerfile
 /*.iml
 /helm/verifier/templates/_helpers.yaml
 /helm/verifier/.helmignore
