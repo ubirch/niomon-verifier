@@ -4,3 +4,4 @@
 /helm/verifier/templates/_helpers.yaml
 /helm/verifier/.helmignore
 /helm/verifier/values.*.yaml
+*~
