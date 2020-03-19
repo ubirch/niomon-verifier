@@ -16,14 +16,14 @@
 
 package com.ubirch.signatureverifier
 
-import com.ubirch.client.protocol.DefaultProtocolVerifier
+import com.ubirch.client.protocol.MultiKeyProtocolVerifier
 import com.ubirch.niomon.base.NioMicroserviceLive
 
 object Main {
   def main(args: Array[String]): Unit = {
     val _ = NioMicroserviceLive(
       "niomon-verifier",
-      SignatureVerifierMicroservice(c => new DefaultProtocolVerifier(new CachingUbirchKeyService(c)))
+      SignatureVerifierMicroservice(c => new MultiKeyProtocolVerifier(new CachingUbirchKeyService(c)))
     ).runUntilDoneAndShutdownProcess
   }
 }
