@@ -2,7 +2,6 @@ package com.ubirch.signatureverifier
 
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
-import java.nio.charset.StandardCharsets.UTF_8
 import java.security.SignatureException
 import java.util.Base64
 import java.util.concurrent.TimeUnit
@@ -14,11 +13,9 @@ import com.ubirch.niomon.base.{NioMicroservice, NioMicroserviceLogic}
 import com.ubirch.protocol.ProtocolMessage
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.ProducerRecord
-import org.apache.kafka.common.header.internals.RecordHeader
 import org.msgpack.core.MessagePack
 import org.redisson.api.RMapCache
 
-import scala.collection.JavaConverters._
 
 class SignatureVerifierMicroservice(
                                      verifierFactory: NioMicroservice.Context => MultiKeyProtocolVerifier,
@@ -44,10 +41,9 @@ class SignatureVerifierMicroservice(
           val hash = pm.getPayload.asText().getBytes(StandardCharsets.UTF_8)
           uppCache.fastPut(hash, b64(rawPacket(pm)), uppTtl.toNanos, TimeUnit.NANOSECONDS, uppMaxIdleTime.toNanos, TimeUnit.NANOSECONDS)
 
-          val algorithmHeader = new RecordHeader("algorithm", key.getSignatureAlgorithm.getBytes(UTF_8))
-          record.toProducerRecord(
-            topic = onlyOutputTopic,
-            headers = (record.headers().toArray :+ algorithmHeader).toIterable.asJava)
+          record.toProducerRecord(topic = onlyOutputTopic)
+            .withExtraHeaders(("algorithm", key.getSignatureAlgorithm))
+
         case None => throw new SignatureException("Invalid signature")
       }
     } catch {
