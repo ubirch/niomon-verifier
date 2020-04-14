@@ -2,27 +2,32 @@ package com.ubirch.signatureverifier
 
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
+import java.nio.charset.StandardCharsets.UTF_8
 import java.security.SignatureException
 import java.util.Base64
 import java.util.concurrent.TimeUnit
 
+import com.ubirch.client.protocol.MultiKeyProtocolVerifier
 import com.ubirch.kafka.{MessageEnvelope, _}
-import com.ubirch.niomon.base.{NioMicroservice, NioMicroserviceLogic}
 import com.ubirch.niomon.base.NioMicroservice.WithHttpStatus
-import com.ubirch.protocol.{ProtocolMessage, ProtocolVerifier}
+import com.ubirch.niomon.base.{NioMicroservice, NioMicroserviceLogic}
+import com.ubirch.protocol.ProtocolMessage
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.ProducerRecord
+import org.apache.kafka.common.header.internals.RecordHeader
 import org.msgpack.core.MessagePack
 import org.redisson.api.RMapCache
 
+import scala.collection.JavaConverters._
+
 class SignatureVerifierMicroservice(
-  verifierFactory: NioMicroservice.Context => ProtocolVerifier,
-  runtime: NioMicroservice[MessageEnvelope, MessageEnvelope]
-) extends NioMicroserviceLogic(runtime) {
+                                     verifierFactory: NioMicroservice.Context => MultiKeyProtocolVerifier,
+                                     runtime: NioMicroservice[MessageEnvelope, MessageEnvelope]
+                                   ) extends NioMicroserviceLogic(runtime) {
 
   import SignatureVerifierMicroservice._
 
-  val verifier: ProtocolVerifier = verifierFactory(context)
+  val verifier: MultiKeyProtocolVerifier = verifierFactory(context)
   // this cache is shared with verification-microservice (not a part of niomon) for faster verification on its side
   private val uppCache: RMapCache[Array[Byte], String] = context.redisCache.redisson.getMapCache("verifier-upp-cache")
   private val uppTtl = config.getDuration("verifier-upp-cache.timeToLive")
@@ -30,27 +35,31 @@ class SignatureVerifierMicroservice(
 
   override def processRecord(record: ConsumerRecord[String, MessageEnvelope]): ProducerRecord[String, MessageEnvelope] = {
     // try ... catch is here, because `verifier.verify` may also throw
+
     try {
       val pm = record.value().ubirchPacket
-      if (!verifier.verify(pm.getUUID, pm.getSigned, 0, pm.getSigned.length, pm.getSignature)) {
-        throw new SignatureException("Invalid signature")
-      }
-      // TODO: This won't work for payloads that are json objects, this just works for primitives
-      val hash = pm.getPayload.asText().getBytes(StandardCharsets.UTF_8)
+      verifier.verifyMulti(pm.getUUID, pm.getSigned, 0, pm.getSigned.length, pm.getSignature) match {
+        case Some(key) =>
+          // TODO: This won't work for payloads that are json objects, this just works for primitives
+          val hash = pm.getPayload.asText().getBytes(StandardCharsets.UTF_8)
+          uppCache.fastPut(hash, b64(rawPacket(pm)), uppTtl.toNanos, TimeUnit.NANOSECONDS, uppMaxIdleTime.toNanos, TimeUnit.NANOSECONDS)
 
-      uppCache.fastPut(hash, b64(rawPacket(pm)), uppTtl.toNanos, TimeUnit.NANOSECONDS, uppMaxIdleTime.toNanos, TimeUnit.NANOSECONDS)
+          val algorithmHeader = new RecordHeader("algorithm", key.getSignatureAlgorithm.getBytes(UTF_8))
+          record.toProducerRecord(
+            topic = onlyOutputTopic,
+            headers = (record.headers().toArray :+ algorithmHeader).toIterable.asJava)
+        case None => throw new SignatureException("Invalid signature")
+      }
     } catch {
       case e: Exception =>
         throw WithHttpStatus(400, e)
     }
-
-    record.toProducerRecord(onlyOutputTopic)
   }
 }
 
 object SignatureVerifierMicroservice {
-  def apply(verifierFactory: NioMicroservice.Context => ProtocolVerifier)
-    (runtime: NioMicroservice[MessageEnvelope, MessageEnvelope]): SignatureVerifierMicroservice =
+  def apply(verifierFactory: NioMicroservice.Context => MultiKeyProtocolVerifier)
+           (runtime: NioMicroservice[MessageEnvelope, MessageEnvelope]): SignatureVerifierMicroservice =
     new SignatureVerifierMicroservice(verifierFactory, runtime)
 
   //// functions below this line are for formatting the upp in the way compatible with what verification-microservice is doing
