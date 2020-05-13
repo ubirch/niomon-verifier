@@ -23,7 +23,7 @@ object Main {
   def main(args: Array[String]): Unit = {
     val _ = NioMicroserviceLive(
       "niomon-verifier",
-      SignatureVerifierMicroservice(c => new MultiKeyProtocolVerifier(new CachingUbirchKeyService(c)))
+      SignatureVerifierMicroserviceNew(c => new MultiKeyProtocolVerifier(new CachingUbirchKeyService(c)))
     ).runUntilDoneAndShutdownProcess
   }
 }

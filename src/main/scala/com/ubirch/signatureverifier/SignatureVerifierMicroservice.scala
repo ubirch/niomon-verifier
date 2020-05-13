@@ -41,13 +41,14 @@ class SignatureVerifierMicroservice(
           val hash = pm.getPayload.asText().getBytes(StandardCharsets.UTF_8)
           uppCache.fastPut(hash, b64(rawPacket(pm)), uppTtl.toNanos, TimeUnit.NANOSECONDS, uppMaxIdleTime.toNanos, TimeUnit.NANOSECONDS)
 
-          record.toProducerRecord(topic = onlyOutputTopic)
+          record.toProducerRecord[MessageEnvelope](topic = onlyOutputTopic)
             .withExtraHeaders(("algorithm", key.getSignatureAlgorithm))
 
         case None => throw new SignatureException("Invalid signature")
       }
     } catch {
       case e: Exception =>
+        //Todo: This is send as byteArray to topic invalid; is that okej??
         throw WithHttpStatus(400, e)
     }
   }
