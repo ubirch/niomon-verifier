@@ -2,7 +2,6 @@ package com.ubirch.signatureverifier
 
 import java.util.{Base64, UUID}
 
-import akka.protobuf.ByteString
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
 import com.ubirch.client.protocol.DefaultProtocolVerifier
@@ -65,7 +64,7 @@ class RoutingTestNew extends FlatSpec with Matchers with StrictLogging {
 
 
   "msgpackv2 with valid signature" should "be routed to 'valid' queue" in {
-    val binary = ByteString.copyFrom(DatatypeConverter.parseHexBinary(v2MsgPackHex)).toByteArray
+    val binary = DatatypeConverter.parseHexBinary(v2MsgPackHex)
     val record = new ProducerRecord[String, Array[Byte]]("incoming", 1, "foo", binary, new RecordHeaders().add(new RecordHeader("X-Ubirch-Hardware-Id".toLowerCase, v2HardwareId.getBytes())))
     publishToKafka(record)
 
@@ -77,7 +76,7 @@ class RoutingTestNew extends FlatSpec with Matchers with StrictLogging {
   }
 
   "msgpackv1 with valid signature" should "be routed to 'valid' queue" in {
-    val binary = ByteString.copyFrom(DatatypeConverter.parseHexBinary(v1MsgPackHex)).toByteArray
+    val binary = DatatypeConverter.parseHexBinary(v1MsgPackHex)
     val record = new ProducerRecord[String, Array[Byte]]("incoming", 1, "foo", binary, new RecordHeaders().add(new RecordHeader("X-Ubirch-Hardware-Id".toLowerCase, v1HardwareId.getBytes())))
     publishToKafka(record)
 
@@ -89,7 +88,7 @@ class RoutingTestNew extends FlatSpec with Matchers with StrictLogging {
   }
 
   "msgpackv1 with invalid signature" should "be routed to 'valid' queue" in {
-    val binary = ByteString.copyFrom(DatatypeConverter.parseHexBinary(v1MsgPackHex + "12")).toByteArray
+    val binary = DatatypeConverter.parseHexBinary(v1MsgPackHex + "12")
     val record = new ProducerRecord[String, Array[Byte]]("incoming", 1, "foo", binary, new RecordHeaders().add(new RecordHeader("X-Ubirch-Hardware-Id".toLowerCase, v1HardwareId.getBytes())))
     publishToKafka(record)
 
@@ -101,7 +100,7 @@ class RoutingTestNew extends FlatSpec with Matchers with StrictLogging {
   }
 
   "trackleMsg with valid signature" should "be routed to 'valid' queue" in {
-    val binary = ByteString.copyFrom(DatatypeConverter.parseHexBinary(trackleMsgPack)).toByteArray
+    val binary = DatatypeConverter.parseHexBinary(trackleMsgPack)
     val record = new ProducerRecord[String, Array[Byte]]("incoming", 1, "foo", binary, new RecordHeaders().add(new RecordHeader("X-Ubirch-Hardware-Id".toLowerCase, trackleHardwareId.getBytes())))
     publishToKafka(record)
 

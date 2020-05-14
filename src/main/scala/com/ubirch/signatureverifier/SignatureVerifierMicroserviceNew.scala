@@ -12,10 +12,8 @@ import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.redisson.api.RMapCache
 
-class SignatureVerifierMicroserviceNew(
-                                        verifierFactory: NioMicroservice.Context => MultiKeyProtocolVerifier,
-                                        runtime: NioMicroservice[Array[Byte], Array[Byte]]
-                                      ) extends NioMicroserviceLogic(runtime) {
+class SignatureVerifierMicroserviceNew(verifierFactory: NioMicroservice.Context => MultiKeyProtocolVerifier,
+                                       runtime: NioMicroservice[Array[Byte], Array[Byte]]) extends NioMicroserviceLogic(runtime) {
 
   import SignatureVerifierMicroserviceNew._
 
@@ -36,6 +34,7 @@ class SignatureVerifierMicroserviceNew(
 
           val hardwareId = UUID.fromString(hardwareIdHeader)
           val msgPack = record.value()
+          //Todo: Should I check the length of the package before splitting it?
           val signatureIdentifierLength = differentiateUbirchMsgPackVersion(msgPack, hardwareId)
           val payload = msgPack.dropRight(64 + signatureIdentifierLength)
           val signature = msgPack.takeRight(64)
