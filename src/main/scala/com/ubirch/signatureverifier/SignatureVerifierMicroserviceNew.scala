@@ -1,6 +1,5 @@
 package com.ubirch.signatureverifier
 
-import java.nio.charset.StandardCharsets
 import java.security.SignatureException
 import java.util.concurrent.TimeUnit
 import java.util.{Base64, UUID}
@@ -31,13 +30,13 @@ class SignatureVerifierMicroserviceNew(
   override def processRecord(record: ConsumerRecord[String, Array[Byte]]): ProducerRecord[String, Array[Byte]] = {
 
     try {
-      record.headers().toArray.find(_.key() == HARDWARE_ID_HEADER_KEY) match {
+      record.findHeader(HARDWARE_ID_HEADER_KEY) match {
 
-        case Some(hardwareIdHeader) =>
+        case Some(hardwareIdHeader: String) =>
 
-          val hardwareId = getUUIDFromBytes(hardwareIdHeader.value())
+          val hardwareId = UUID.fromString(hardwareIdHeader)
           val msgPack = record.value()
-          val signatureIdentifierLength = differentiateRegardingUbirchMsgPackVersion(msgPack, hardwareId)
+          val signatureIdentifierLength = differentiateUbirchMsgPackVersion(msgPack, hardwareId)
           val payload = msgPack.dropRight(64 + signatureIdentifierLength)
           val signature = msgPack.takeRight(64)
 
@@ -68,7 +67,7 @@ class SignatureVerifierMicroserviceNew(
     }
   }
 
-  private def differentiateRegardingUbirchMsgPackVersion(msgPack: Array[Byte], hardwareId: UUID) = {
+  private def differentiateUbirchMsgPackVersion(msgPack: Array[Byte], hardwareId: UUID) = {
     val hexMsgPack = convertBytesToHex(msgPack, hardwareId)
     hexMsgPack(2) match {
       case '1' =>
@@ -97,17 +96,6 @@ class SignatureVerifierMicroserviceNew(
     } catch {
       case ex: Throwable =>
         val errorMsg = s"couldn't convert bytes for $hardwareId to hexString"
-        throw logAndThrowSignExc(ex, errorMsg)
-    }
-  }
-
-  @throws[SignatureException]
-  private def getUUIDFromBytes(bytes: Array[Byte]): UUID = {
-    try {
-      UUID.fromString(new String(bytes, StandardCharsets.UTF_8))
-    } catch {
-      case ex: Throwable =>
-        val errorMsg = s"couldn't receive hwDeviceId from msgPack kafka message header to retrieve pubKey for verification."
         throw logAndThrowSignExc(ex, errorMsg)
     }
   }
