@@ -10,6 +10,7 @@ import com.ubirch.niomon.base.NioMicroservice.WithHttpStatus
 import com.ubirch.niomon.base.{NioMicroservice, NioMicroserviceLogic}
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.ProducerRecord
+import org.bouncycastle.util.encoders.Hex
 import org.redisson.api.RMapCache
 
 class SignatureVerifierMicroserviceNew(verifierFactory: NioMicroservice.Context => MultiKeyProtocolVerifier,
@@ -35,7 +36,7 @@ class SignatureVerifierMicroserviceNew(verifierFactory: NioMicroservice.Context 
           val hardwareId = UUID.fromString(hardwareIdHeader)
           val msgPack = record.value()
           //Todo: Should I check the length of the package before splitting it?
-          val signatureIdentifierLength = differentiateUbirchMsgPackVersion(msgPack, hardwareId)
+          val signatureIdentifierLength = differentiateUbirchMsgPackVersion(msgPack)
           val payload = msgPack.dropRight(64 + signatureIdentifierLength)
           val signature = msgPack.takeRight(64)
 
@@ -66,8 +67,8 @@ class SignatureVerifierMicroserviceNew(verifierFactory: NioMicroservice.Context 
     }
   }
 
-  private def differentiateUbirchMsgPackVersion(msgPack: Array[Byte], hardwareId: UUID) = {
-    val hexMsgPack = convertBytesToHex(msgPack, hardwareId)
+  private def differentiateUbirchMsgPackVersion(msgPack: Array[Byte]) = {
+    val hexMsgPack = Hex.toHexString(msgPack)
     hexMsgPack(2) match {
       case '1' =>
         logger.info("msgPack version 1 was found")
@@ -83,25 +84,6 @@ class SignatureVerifierMicroserviceNew(verifierFactory: NioMicroservice.Context 
         logger.error(errorMsg)
         throw new IllegalArgumentException(errorMsg)
     }
-  }
-
-  private def convertBytesToHex(bytes: Seq[Byte], hardwareId: UUID): String = {
-    try {
-      val sb = new StringBuilder
-      for (b <- bytes) {
-        sb.append(String.format("%02x", Byte.box(b)))
-      }
-      sb.toString
-    } catch {
-      case ex: Throwable =>
-        val errorMsg = s"couldn't convert bytes for $hardwareId to hexString"
-        throw logAndThrowSignExc(ex, errorMsg)
-    }
-  }
-
-  private def logAndThrowSignExc(ex: Throwable, errorMsg: String): SignatureException = {
-    logger.error(errorMsg, ex)
-    new SignatureException(errorMsg)
   }
 
 }

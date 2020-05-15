@@ -99,6 +99,18 @@ class RoutingTestNew extends FlatSpec with Matchers with StrictLogging {
     rejectedMessage.map(_.toChar).mkString should equal("{\"error\":\"SignatureException: Invalid signature\",\"causes\":[],\"microservice\":\"niomon-verifier\",\"requestId\":\"foo\"}")
   }
 
+  "msgpackv1 with no hwDeviceId in the header" should "be routed to 'valid' queue" in {
+    val binary = DatatypeConverter.parseHexBinary(v1MsgPackHex + "12")
+    val record = new ProducerRecord[String, Array[Byte]]("incoming", 1, "foo", binary, new RecordHeaders().add(new RecordHeader("No-Hardware-Id".toLowerCase, v1HardwareId.getBytes())))
+    publishToKafka(record)
+
+    val invalidTopicEnvelopes = consumeNumberMessagesFrom("invalid", 1, autoCommit = true)
+    invalidTopicEnvelopes.size should be(1)
+
+    val rejectedMessage: Array[Byte] = invalidTopicEnvelopes.head
+    rejectedMessage.map(_.toChar).mkString should equal("{\"error\":\"SignatureException: Header with key x-ubirch-hardware-id is missing. Cannot verify msgPack.\",\"causes\":[],\"microservice\":\"niomon-verifier\",\"requestId\":\"foo\"}")
+  }
+
   "trackleMsg with valid signature" should "be routed to 'valid' queue" in {
     val binary = DatatypeConverter.parseHexBinary(trackleMsgPack)
     val record = new ProducerRecord[String, Array[Byte]]("incoming", 1, "foo", binary, new RecordHeaders().add(new RecordHeader("X-Ubirch-Hardware-Id".toLowerCase, trackleHardwareId.getBytes())))
