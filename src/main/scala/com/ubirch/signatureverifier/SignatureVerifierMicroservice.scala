@@ -1,8 +1,7 @@
 package com.ubirch.signatureverifier
 
 import java.security.SignatureException
-import java.util.concurrent.TimeUnit
-import java.util.{Base64, UUID}
+import java.util.UUID
 
 import com.ubirch.client.protocol.MultiKeyProtocolVerifier
 import com.ubirch.kafka.{RichAnyConsumerRecord, RichAnyProducerRecord}
@@ -11,20 +10,12 @@ import com.ubirch.niomon.base.{NioMicroservice, NioMicroserviceLogic}
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.bouncycastle.util.encoders.Hex
-import org.redisson.api.RMapCache
 
 class SignatureVerifierMicroservice(verifierFactory: NioMicroservice.Context => MultiKeyProtocolVerifier,
                                     runtime: NioMicroservice[Array[Byte], Array[Byte]]) extends NioMicroserviceLogic(runtime) {
 
-  import SignatureVerifierMicroservice._
-
   private val HARDWARE_ID_HEADER_KEY = "x-ubirch-hardware-id"
   val verifier: MultiKeyProtocolVerifier = verifierFactory(context)
-
-  //   this cache is shared with verification-microservice (not a part of niomon) for faster verification on its side
-  private val uppCache: RMapCache[Array[Byte], String] = context.redisCache.redisson.getMapCache("verifier-upp-cache")
-  private val uppTtl = config.getDuration("verifier-upp-cache.timeToLive")
-  private val uppMaxIdleTime = config.getDuration("verifier-upp-cache.maxIdleTime")
 
   override def processRecord(record: ConsumerRecord[String, Array[Byte]]): ProducerRecord[String, Array[Byte]] = {
 
@@ -42,15 +33,9 @@ class SignatureVerifierMicroservice(verifierFactory: NioMicroservice.Context => 
 
           //Todo: Use cached KeyServiceClient
           verifier.verifyMulti(hardwareId, payload, 0, payload.length, signature) match {
-
             case Some(key) =>
-              //Todo: Is equivalent? val hash = pm.getPayload.asText().getBytes(StandardCharsets.UTF_8)
-              val hash = payload
-              uppCache.fastPut(hash, b64(msgPack), uppTtl.toNanos, TimeUnit.NANOSECONDS, uppMaxIdleTime.toNanos, TimeUnit.NANOSECONDS)
-
               record.toProducerRecord[Array[Byte]](topic = onlyOutputTopic)
                 .withExtraHeaders(("algorithm", key.getSignatureAlgorithm))
-
             case None =>
               val errorMsg = s"signature verification failed for msgPack of hardwareId $hardwareId."
               logger.error(errorMsg)
@@ -92,13 +77,4 @@ object SignatureVerifierMicroservice {
   def apply(verifierFactory: NioMicroservice.Context => MultiKeyProtocolVerifier)
            (runtime: NioMicroservice[Array[Byte], Array[Byte]]): SignatureVerifierMicroservice =
     new SignatureVerifierMicroservice(verifierFactory, runtime)
-
-  //// functions below this line are for formatting the upp in the way compatible with what verification-microservice is doing
-
-  //Todo: Is this also per default this way?
-  //    private val msgPackConfig = new MessagePack.PackerConfig().withStr8FormatSupport(false)
-
-
-  private def b64(x: Array[Byte]): String = if (x != null) Base64.getEncoder.encodeToString(x) else null
-
 }
