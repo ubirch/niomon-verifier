@@ -11,6 +11,18 @@ import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.bouncycastle.util.encoders.Hex
 
+/**
+ *
+ * +=========+======+==================+======+=========+-------------+
+ * | VERSION | UUID | [PREV-SIGNATURE] | TYPE | PAYLOAD | [SIGNATURE] |
+ * +=========+======+==================+======+=========+-------------+
+ * =   ➔ data used for signature (4 elements)
+ * []  ➔ optional fields, depending on lower 4 bit of version
+ *
+ *
+ * @param verifierFactory
+ * @param runtime
+ */
 class SignatureVerifierMicroservice(verifierFactory: NioMicroservice.Context => MultiKeyProtocolVerifier,
                                     runtime: NioMicroservice[Array[Byte], Array[Byte]]) extends NioMicroserviceLogic(runtime) {
 
@@ -28,11 +40,11 @@ class SignatureVerifierMicroservice(verifierFactory: NioMicroservice.Context => 
           val msgPack = record.value()
           //Todo: Should I check the length of the package before splitting it?
           val signatureIdentifierLength = differentiateUbirchMsgPackVersion(msgPack)
-          val payload = msgPack.dropRight(64 + signatureIdentifierLength)
+          val restOfMessage = msgPack.dropRight(64 + signatureIdentifierLength)
           val signature = msgPack.takeRight(64)
 
           //Todo: Use cached KeyServiceClient
-          verifier.verifyMulti(hardwareId, payload, 0, payload.length, signature) match {
+          verifier.verifyMulti(hardwareId, restOfMessage, 0, restOfMessage.length, signature) match {
             case Some(key) =>
               record.toProducerRecord[Array[Byte]](topic = onlyOutputTopic)
                 .withExtraHeaders(("algorithm", key.getSignatureAlgorithm))
