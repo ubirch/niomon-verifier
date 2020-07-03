@@ -32,6 +32,9 @@ class SignatureVerifierMicroservice(verifierFactory: NioMicroservice.Context => 
   override def processRecord(record: ConsumerRecord[String, Array[Byte]]): ProducerRecord[String, Array[Byte]] = {
 
     try {
+
+      logger.info("msg_pack={}", Hex.toHexString(record.value()))
+
       record.findHeader(HARDWARE_ID_HEADER_KEY) match {
 
         case Some(hardwareIdHeader: String) =>
@@ -61,7 +64,6 @@ class SignatureVerifierMicroservice(verifierFactory: NioMicroservice.Context => 
 
     } catch {
       case e: Exception =>
-        logger.error("msg_pack={}", Hex.toHexString(record.value()))
         throw WithHttpStatus(400, e)
     }
   }
