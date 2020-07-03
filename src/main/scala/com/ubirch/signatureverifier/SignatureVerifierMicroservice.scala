@@ -58,8 +58,10 @@ class SignatureVerifierMicroservice(verifierFactory: NioMicroservice.Context => 
           logger.error(errorMsg)
           throw new SignatureException(errorMsg)
       }
+
     } catch {
       case e: Exception =>
+        logger.error("msg_pack={}", Hex.toHexString(record.value()))
         throw WithHttpStatus(400, e)
     }
   }
