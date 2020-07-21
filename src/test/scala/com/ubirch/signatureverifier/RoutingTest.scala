@@ -6,6 +6,7 @@ import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
 import com.ubirch.client.protocol.DefaultProtocolVerifier
 import com.ubirch.client.util.curveFromString
+import com.ubirch.kafka.RichAnyProducerRecord
 import com.ubirch.crypto.{GeneratorKeyFactory, PubKey}
 import com.ubirch.niomon.base.{NioMicroservice, NioMicroserviceMock}
 import javax.xml.bind.DatatypeConverter
@@ -89,7 +90,8 @@ class RoutingTest extends FlatSpec with Matchers with StrictLogging {
 
   "msgpackv1 with invalid signature" should "be routed to 'invalid' queue" in {
     val binary = DatatypeConverter.parseHexBinary(v1MsgPackHex + "12")
-    val record = new ProducerRecord[String, Array[Byte]]("incoming", 1, "foo", binary, new RecordHeaders().add(new RecordHeader("X-Ubirch-Hardware-Id".toLowerCase, v1HardwareId.getBytes())))
+    val record = new ProducerRecord[String, Array[Byte]]("incoming", binary).withExtraHeaders("X-Ubirch-Hardware-Id".toLowerCase -> v1HardwareId).withRequestIdHeader()("foo")
+
     publishToKafka(record)
 
     val invalidTopicEnvelopes = consumeNumberStringMessagesFrom("invalid", 1, autoCommit = true)
@@ -101,7 +103,7 @@ class RoutingTest extends FlatSpec with Matchers with StrictLogging {
 
   "msgpackv1 with no hwDeviceId in the header" should "be routed to 'valid' queue" in {
     val binary = DatatypeConverter.parseHexBinary(v1MsgPackHex + "12")
-    val record = new ProducerRecord[String, Array[Byte]]("incoming", 1, "foo", binary, new RecordHeaders().add(new RecordHeader("No-Hardware-Id".toLowerCase, v1HardwareId.getBytes())))
+    val record = new ProducerRecord[String, Array[Byte]]("incoming", binary).withRequestIdHeader()("foo")
     publishToKafka(record)
 
     val invalidTopicEnvelopes = consumeNumberMessagesFrom("invalid", 1, autoCommit = true)
