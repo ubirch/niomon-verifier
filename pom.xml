@@ -75,6 +75,8 @@
     <properties>
         <build.number>devbuild</build.number>
         <skinny-framework.version>3.0.1</skinny-framework.version>
+        <!-- used for sonarqube integration -->
+        <sonar.projectKey>ubirch_niomon-verifier</sonar.projectKey>
     </properties>
 
     <dependencies>
